@@ -1,17 +1,20 @@
-import logging
-import http.client	
+import http.client
 import json
-from six.moves.urllib.request import urlopen
-from functools import wraps
+import logging
 import os
-from jose import jwt
+from functools import wraps
 
-def authenticate(token):	
+from jose import jwt
+from six.moves.urllib.request import urlopen
+
+
+def authenticate(token):
     auth0_domain = os.environ["AUTH0_DOMAIN"]
     auth0_audience = os.environ["AUTH0_AUDIENCE"]
     algorithms = ["RS256"]
 
     return requires_auth(algorithms, auth0_audience, auth0_domain, token)
+
 
 def requires_auth(algorithms, auth0_audience, auth0_domain, token):
     """Determines if the Access Token is valid"""
@@ -22,7 +25,7 @@ def requires_auth(algorithms, auth0_audience, auth0_domain, token):
         unverified_header = jwt.get_unverified_header(token)
     except Exception:
         return False, {"code": "invalid_format",
-                "description": "token format is invalid"}
+                       "description": "token format is invalid"}
     rsa_key = {}
     for key in jwks["keys"]:
         if key["kid"] == unverified_header["kid"]:

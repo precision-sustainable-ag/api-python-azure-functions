@@ -1,17 +1,18 @@
-import logging
-import pandas as pd
-import sys
-import psycopg2
-from psycopg2 import sql
-import os
-import sqlalchemy
-import traceback
-import mysql.connector
 import json
+import logging
+import os
+import sys
+import traceback
+
+import azure.functions as func
+import mysql.connector
+import pandas as pd
+import psycopg2
+import sqlalchemy
+from psycopg2 import sql
 
 from ..SharedFunctions import authenticator
 
-import azure.functions as func
 
 class SubmitNewEntry:
     def __init__(self, req):
@@ -34,20 +35,22 @@ class SubmitNewEntry:
             return True, response
 
     def connect_to_shadow_live(self):
-        postgres_host = os.environ.get('LIVE_SHADOW_HOST')
+        postgres_host = os.environ.get('LIVE_HOST')
         postgres_dbname = os.environ.get('LIVE_SHADOW_DBNAME')
-        postgres_user = os.environ.get('LIVE_SHADOW_USER')
-        postgres_password = os.environ.get('LIVE_SHADOW_PASSWORD')
-        postgres_sslmode = os.environ.get('LIVE_SHADOW_SSLMODE')
+        postgres_user = os.environ.get('LIVE_USER')
+        postgres_password = os.environ.get('LIVE_PASSWORD')
+        postgres_sslmode = os.environ.get('LIVE_SSLMODE')
 
         # Make postgres connections
-        postgres_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(postgres_host, postgres_user, postgres_dbname, postgres_password, postgres_sslmode)
+        postgres_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(
+            postgres_host, postgres_user, postgres_dbname, postgres_password, postgres_sslmode)
         # print(postgres_con_string)
         self.shadow_con = psycopg2.connect(postgres_con_string)
         self.shadow_cur = self.shadow_con.cursor()
         self.shadow_con.autocommit = True
 
-        postgres_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(postgres_user, postgres_password, postgres_host, postgres_dbname)
+        postgres_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(
+            postgres_user, postgres_password, postgres_host, postgres_dbname)
         self.shadow_engine = sqlalchemy.create_engine(postgres_engine_string)
 
         print("connected to shadow live")
@@ -56,18 +59,19 @@ class SubmitNewEntry:
         sql_string = "UPDATE invalid_row_table_pairs SET resolved = 1 WHERE uid = %s"
         self.shadow_cur.execute(sql_string, (self.uid,))
 
+
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
-    
+
     try:
         sne = SubmitNewEntry(req)
 
         authenticated, response = sne.authenticate()
         if not authenticated:
             return func.HttpResponse(json.dumps(response), headers={'content-type': 'application/json'}, status_code=400)
-            
+
         sne.set_resolved()
-                
+
         return func.HttpResponse(body="Successfully inserted new entry", headers={'content-type': 'application/json'}, status_code=201)
 
     except Exception:

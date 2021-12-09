@@ -1,20 +1,21 @@
-import logging
-import pandas as pd
-import sys
-import psycopg2
-from psycopg2 import sql
-import os
-import sqlalchemy
-import traceback
-import mysql.connector
-import pymysql
 import json
+import logging
+import os
+import sys
+import traceback
+
+import azure.functions as func
+import mysql.connector
+import pandas as pd
+import psycopg2
+import pymysql
+import sqlalchemy
+from psycopg2 import sql
 
 from ..SharedFunctions import authenticator
 
-import azure.functions as func
-
 pymysql.install_as_MySQLdb()
+
 
 class KoboAPI:
     def __init__(self, req):
@@ -30,20 +31,22 @@ class KoboAPI:
             self.xform_id_string = req_body.get('xform_id_string')
 
     def connect_to_shadow_live(self):
-        postgres_host = os.environ.get('LIVE_SHADOW_HOST')
+        postgres_host = os.environ.get('LIVE_HOST')
         postgres_dbname = os.environ.get('LIVE_SHADOW_DBNAME')
-        postgres_user = os.environ.get('LIVE_SHADOW_USER')
-        postgres_password = os.environ.get('LIVE_SHADOW_PASSWORD')
-        postgres_sslmode = os.environ.get('LIVE_SHADOW_SSLMODE')
+        postgres_user = os.environ.get('LIVE_USER')
+        postgres_password = os.environ.get('LIVE_PASSWORD')
+        postgres_sslmode = os.environ.get('LIVE_SSLMODE')
 
         # Make postgres connections
-        postgres_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(postgres_host, postgres_user, postgres_dbname, postgres_password, postgres_sslmode)
+        postgres_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(
+            postgres_host, postgres_user, postgres_dbname, postgres_password, postgres_sslmode)
         # print(postgres_con_string)
         self.shadow_con = psycopg2.connect(postgres_con_string)
         self.shadow_cur = self.shadow_con.cursor()
         self.shadow_con.autocommit = True
 
-        postgres_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(postgres_user, postgres_password, postgres_host, postgres_dbname)
+        postgres_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(
+            postgres_user, postgres_password, postgres_host, postgres_dbname)
         self.shadow_engine = sqlalchemy.create_engine(postgres_engine_string)
 
         print("connected to shadow live")
@@ -53,9 +56,10 @@ class KoboAPI:
         mysql_dbname = os.environ.get('MYSQL_DBNAME')
         mysql_user = os.environ.get('MYSQL_USER')
         mysql_password = os.environ.get('MYSQL_PASSWORD')
-        
+
         # Make mysql connections
-        mysql_engine_string = "mysql://{0}:{1}@{2}/{3}".format(mysql_user, mysql_password, mysql_host, mysql_dbname)
+        mysql_engine_string = "mysql://{0}:{1}@{2}/{3}".format(
+            mysql_user, mysql_password, mysql_host, mysql_dbname)
         self.mysql_engine = sqlalchemy.create_engine(mysql_engine_string)
 
         print("connected to mysql live")
@@ -68,7 +72,8 @@ class KoboAPI:
             return True, response
 
     def fetch_bad_uids_data(self, xform_id_string):
-        invalid_rows = pd.DataFrame(pd.read_sql("SELECT DISTINCT uid, err, data FROM invalid_row_table_pairs WHERE xform_id_string = '{}' AND resolved = 0".format(xform_id_string), self.shadow_engine))
+        invalid_rows = pd.DataFrame(pd.read_sql(
+            "SELECT DISTINCT uid, err, data FROM invalid_row_table_pairs WHERE xform_id_string = '{}' AND resolved = 0".format(xform_id_string), self.shadow_engine))
         return invalid_rows
 
     # def fetch_uid_history(self, xform_id_string):
@@ -76,11 +81,13 @@ class KoboAPI:
     #     return uid_history
 
     def fetch_all_data(self, xform_id_string):
-        all_rows = pd.DataFrame(pd.read_sql("SELECT data, uid FROM kobo WHERE xform_id_string = '{}'".format(xform_id_string), self.mysql_engine))
+        all_rows = pd.DataFrame(pd.read_sql(
+            "SELECT data, uid FROM kobo WHERE xform_id_string = '{}'".format(xform_id_string), self.mysql_engine))
         return all_rows
 
     def fetch_distinct_uids(self, xform_id_string, resolved):
-        distinct_uids = pd.DataFrame(pd.read_sql("SELECT DISTINCT uid, data FROM invalid_row_table_pairs WHERE xform_id_string = '{}' and resolved = '{}'".format(xform_id_string, resolved), self.shadow_engine))
+        distinct_uids = pd.DataFrame(pd.read_sql("SELECT DISTINCT uid, data FROM invalid_row_table_pairs WHERE xform_id_string = '{}' and resolved = '{}'".format(
+            xform_id_string, resolved), self.shadow_engine))
         return distinct_uids
 
     # def generate_uid_history(self):
@@ -103,7 +110,8 @@ class KoboAPI:
             uid = row_entry.get("uid")
             data = row_entry.get("data")
             # print(data)
-            errs = pd.DataFrame(pd.read_sql("SELECT DISTINCT err FROM invalid_row_table_pairs WHERE uid = '{}'".format(uid), self.shadow_engine))
+            errs = pd.DataFrame(pd.read_sql(
+                "SELECT DISTINCT err FROM invalid_row_table_pairs WHERE uid = '{}'".format(uid), self.shadow_engine))
             # print(errs.get("err"), uid)
             errs_list = []
             for index, row_entry in errs.iterrows():
@@ -124,7 +132,8 @@ class KoboAPI:
             uid = row_entry.get("uid")
             if uid not in invalid_rows.uid.tolist():
                 # print(row_entry.get("uid"))
-                valid_list.append({"data": row_entry.get("data"), "errs": row_entry.get("err"), "uid": uid})
+                valid_list.append({"data": row_entry.get(
+                    "data"), "errs": row_entry.get("err"), "uid": uid})
 
         return valid_list
 
@@ -140,6 +149,7 @@ class KoboAPI:
         }
 
         return data
+
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
