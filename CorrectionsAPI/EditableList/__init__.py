@@ -56,7 +56,7 @@ class EditableList:
 
     def fetch_editable_list(self):
         editable_list = pd.DataFrame(pd.read_sql(
-            "SELECT editable_list FROM editable_list_by_version WHERE version = '{}'".format(self.version), self.shadow_engine))
+            "SELECT editable_list, entry_to_iterate, iterator_editable_list FROM editable_list_by_version WHERE version = '{}'".format(self.version), self.shadow_engine))
         return editable_list
 
 
@@ -70,11 +70,18 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         if not authenticated:
             return func.HttpResponse(json.dumps(response), headers={'content-type': 'application/json'}, status_code=400)
 
-        editable_list = el.fetch_editable_list().editable_list.tolist()
-        if not editable_list:
+        editable_list = el.fetch_editable_list()
+
+        if editable_list.empty:
             return func.HttpResponse(json.dumps({"message": "no version in shadow db"}), headers={'content-type': 'application/json'}, status_code=400)
 
-        return func.HttpResponse(body=json.dumps(editable_list[0]), headers={'content-type': 'application/json'}, status_code=200)
+        return_obj = {
+            "editable_list": editable_list.iloc[0].get("editable_list"),
+            "entry_to_iterate": editable_list.iloc[0].get("entry_to_iterate"),
+            "iterator_editable_list": editable_list.iloc[0].get("iterator_editable_list"),
+        }
+
+        return func.HttpResponse(body=json.dumps(return_obj), headers={'content-type': 'application/json'}, status_code=200)
 
     except Exception:
         error = traceback.format_exc()
