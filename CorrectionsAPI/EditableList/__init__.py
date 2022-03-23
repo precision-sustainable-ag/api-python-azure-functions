@@ -56,7 +56,7 @@ class EditableList:
 
     def fetch_editable_list(self):
         editable_list = pd.DataFrame(pd.read_sql(
-            "SELECT editable_list, entry_to_iterate, iterator_editable_list FROM editable_list_by_version WHERE version = '{}'".format(self.version), self.shadow_engine))
+            "SELECT editable_list, entry_to_iterate, iterator_editable_list, table_names FROM editable_list_by_version WHERE version = '{}'".format(self.version), self.shadow_engine))
         return editable_list
 
 
@@ -79,6 +79,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             "editable_list": editable_list.iloc[0].get("editable_list"),
             "entry_to_iterate": editable_list.iloc[0].get("entry_to_iterate"),
             "iterator_editable_list": editable_list.iloc[0].get("iterator_editable_list"),
+            "table_names": editable_list.iloc[0].get("table_names"),
         }
 
         return func.HttpResponse(body=json.dumps(return_obj), headers={'content-type': 'application/json'}, status_code=200)
