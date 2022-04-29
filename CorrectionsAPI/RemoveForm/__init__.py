@@ -5,31 +5,20 @@ import traceback
 
 import azure.functions as func
 
-from ..SharedFunctions import authenticator, db_connectors, global_vars
+from SharedFunctions import authenticator, db_connectors, global_vars, initializer
 
 
 class RemoveForm:
     def __init__(self, req):
-        # get params from route
-        self.uid = req.route_params.get('uid')
+        initial_state = initializer.initilize(
+            route_params=["uid"], body_params=None, req=req)
 
-        # get token
-        try:
-            self.token = req.headers.__http_headers__["authorization"].split(" ")[
-                1]
-            self.token_missing = True if self.token is None else False
-        except KeyError:
-            self.token_missing = True
-
-        # check for missing missing params
-        if self.uid == None:
-            self.invalid_params = True
-        else:
-            self.invalid_params = False
-
-        # authenticate
-        self.authenticated, self.auth_response = authenticator.authenticate(
-            self.token)
+        self.route_params_obj = initial_state["route_params_obj"]
+        self.token = initial_state["token"]
+        self.token_missing = initial_state["token"] == None
+        self.authenticated = initial_state["authenticated"]
+        self.auth_response = initial_state["auth_response"]
+        self.invalid_params = initial_state["route_params_obj"] is None
 
         # connect to dbs
         if self.authenticated:
@@ -39,12 +28,12 @@ class RemoveForm:
 
     def set_resolved(self):
         sql_string = "UPDATE invalid_row_table_pairs SET resolved = 1 WHERE uid = %s"
-        self.shadow_cur.execute(sql_string, (self.uid,))
+        self.shadow_cur.execute(sql_string, (self.route_params_obj["uid"],))
 
         if self.shadow_cur.rowcount == 0:
-            return func.HttpResponse("Failed to remove form", headers=global_vars.HEADER, status_code=400)
+            return func.HttpResponse(json.dumps({"status": "error", "details": "failed to remove form"}), headers=global_vars.HEADER, status_code=400)
         else:
-            return func.HttpResponse("Successfully deleted row {}".format(self.uid), headers=global_vars.HEADER, status_code=201)
+            return func.HttpResponse(json.dumps({"status": "success", "details": "successfully deleted row {}".format(self.route_params_obj["uid"])}), headers=global_vars.HEADER, status_code=201)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -53,16 +42,19 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         remover = RemoveForm(req)
 
-        if not remover.authenticated:
-            return func.HttpResponse(json.dumps(remover.ath_response), headers=global_vars.HEADER, status_code=401)
-        elif remover.invalid_params:
-            return func.HttpResponse("Missing query params", headers=global_vars.HEADER, status_code=400)
-        elif remover.token_missing:
-            return func.HttpResponse("Token missing", headers=global_vars.HEADER, status_code=400)
+        # authenticate user based on token
+        if any([not remover.authenticated, remover.invalid_params, remover.token_missing]):
+            return initializer.get_response(remover.authenticated, remover.auth_response,
+                                            remover.invalid_params, remover.token_missing, False)
         else:
             return remover.set_resolved()
 
-    except Exception:
-        error = traceback.format_exc()
-        logging.error(error)
-        return func.HttpResponse(error, status_code=500)
+    except Exception as error:
+        logging.info("program encountered exception: " +
+                     traceback.format_exc())
+        logging.exception(error)
+        return func.HttpResponse(
+            json.dumps({"status": "error", "details": traceback.format_exc()}),
+            status_code=500,
+            headers=global_vars.HEADER
+        )

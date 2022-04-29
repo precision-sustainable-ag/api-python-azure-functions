@@ -5,7 +5,7 @@ import requests
 
 import azure.functions as func
 
-from ..SharedFunctions import authenticator, auth0_functions, global_vars
+from SharedFunctions import auth0_functions, global_vars, initializer
 
 # github issues class to handle actions on github issues
 
@@ -13,46 +13,31 @@ from ..SharedFunctions import authenticator, auth0_functions, global_vars
 class CreateGithubComment:
     # constructor sets the user variable
     def __init__(self, req):
-        # get params from route
-        self.user = req.route_params.get('user')
-        self.number = req.route_params.get('number')
+        initial_state = initializer.initilize(
+            route_params=["user", "number"], body_params=["comment"], req=req)
 
-        # get params from body
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            self.comment = None
-        else:
-            self.comment = req_body.get('comment')
-
-        # get token
-        try:
-            self.token = req.headers.__http_headers__["authorization"].split(" ")[
-                1]
-            self.token_missing = True if self.token is None else False
-        except KeyError:
-            self.token_missing = True
-
-        # check for missing missing params
-        if None in [self.user, self.comment, self.number]:
-            self.invalid_params = True
-        else:
-            self.invalid_params = False
-
-        # authenticate
-        self.authenticated, self.auth_response = authenticator.authenticate(
-            self.token)
+        self.route_params_obj = initial_state["route_params_obj"]
+        self.body_params_obj = initial_state["body_params_obj"]
+        self.token = initial_state["token"]
+        self.token_missing = initial_state["token"] == None
+        self.authenticated = initial_state["authenticated"]
+        self.auth_response = initial_state["auth_response"]
+        self.invalid_params = initial_state["route_params_obj"] == None or initial_state["body_params_obj"] == None
 
         # get github tokens
-        if self.authenticated:
+        if self.authenticated and not self.invalid_params:
             self.github_user_token, self.github_org_owner_token = auth0_functions.generate_auth0_tokens(
-                self.user)
+                self.route_params_obj.get("user"))
+
+            self.invalid_user = True if self.github_user_token is None or self.github_org_owner_token is None else False
+        else:
+            self.invalid_user = True
 
     def create_github_comment(self):
         # Create an issue on github.com using the given parameters
         # Url to create issues via POST
         url = 'https://api.github.com/repos/%s/%s/issues/%s/comments' % (
-            global_vars.GITHUB_REPO_OWNER, global_vars.GITHUB_REPO_NAME, self.number)
+            global_vars.GITHUB_REPO_OWNER, global_vars.GITHUB_REPO_NAME, self.route_params_obj.get("number"))
 
         # Headers
         headers = {
@@ -62,7 +47,7 @@ class CreateGithubComment:
 
         # Create our issue working properly, just need to add labels etc
         data = {
-            'body': self.comment,
+            'body': self.body_params_obj["comment"],
         }
         payload = json.dumps(data)
         # Add the issue to our repository
@@ -70,18 +55,16 @@ class CreateGithubComment:
         logging.info(str(response.status_code))
 
         if response.status_code == 201:
-            logging.info('Successfully created Comment "%s" on issue #%s' % (
-                self.comment, self.number))
             return func.HttpResponse(
-                'Successfully created Comment "%s" on issue #%s' % (
-                    self.comment, self.number),
+                json.dumps({"status": "success", "details": 'successfully created Comment "%s" on issue #%s' % (
+                    self.body_params_obj["comment"], self.route_params_obj.get("number"))}),
                 status_code=201,
                 headers=global_vars.HEADER
             )
         else:
-            logging.info('Could not create Comment "%s"' % self.comment)
             return func.HttpResponse(
-                'Could not create Comment "%s"' % self.comment,
+                json.dumps({"status": "error", "details": 'could not create comment "%s" on issue #%s' %
+                           (self.body_params_obj["comment"], self.route_params_obj["number"])}),
                 status_code=400,
                 headers=global_vars.HEADER
             )
@@ -97,21 +80,18 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         comment_creator = CreateGithubComment(req)
 
         # authenticate user based on token
-        if not comment_creator.authenticated:
-            return func.HttpResponse(json.dumps(comment_creator.auth_response), headers=global_vars.HEADER, status_code=401)
-        elif comment_creator.invalid_params:
-            return func.HttpResponse("Missing query params", headers=global_vars.HEADER, status_code=400)
-        elif comment_creator.token_missing:
-            return func.HttpResponse("Token missing", headers=global_vars.HEADER, status_code=400)
+        if any([not comment_creator.authenticated, comment_creator.invalid_params, comment_creator.token_missing, comment_creator.invalid_user]):
+            return initializer.get_response(comment_creator.authenticated, comment_creator.auth_response,
+                                            comment_creator.invalid_params, comment_creator.token_missing, comment_creator.invalid_user)
         else:
             return comment_creator.create_github_comment()
 
     except Exception as error:
-        logging.info("Program encountered exception: " +
+        logging.info("program encountered exception: " +
                      traceback.format_exc())
         logging.exception(error)
         return func.HttpResponse(
-            json.dumps({"Message": traceback.format_exc()}),
+            json.dumps({"status": "error", "details": traceback.format_exc()}),
             status_code=500,
             headers=global_vars.HEADER
         )

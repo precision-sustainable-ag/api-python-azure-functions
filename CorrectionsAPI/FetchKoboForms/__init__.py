@@ -6,31 +6,20 @@ import pandas as pd
 
 import azure.functions as func
 
-from ..SharedFunctions import authenticator, db_connectors, global_vars
+from SharedFunctions import authenticator, db_connectors, global_vars, initializer
 
 
 class FetchKoboForms:
     def __init__(self, req):
-        # get params from route
-        self.xform_id_string = req.route_params.get('xform_id_string')
+        initial_state = initializer.initilize(
+            route_params=["xform_id_string"], body_params=None, req=req)
 
-        # get token
-        try:
-            self.token = req.headers.__http_headers__["authorization"].split(" ")[
-                1]
-            self.token_missing = True if self.token is None else False
-        except KeyError:
-            self.token_missing = True
-
-        # check for missing missing params
-        if self.xform_id_string == None:
-            self.invalid_params = True
-        else:
-            self.invalid_params = False
-
-        # authenticate
-        self.authenticated, self.auth_response = authenticator.authenticate(
-            self.token)
+        self.route_params_obj = initial_state["route_params_obj"]
+        self.token = initial_state["token"]
+        self.token_missing = initial_state["token"] == None
+        self.authenticated = initial_state["authenticated"]
+        self.auth_response = initial_state["auth_response"]
+        self.invalid_params = initial_state["route_params_obj"] is None
 
         # connect to dbs
         if self.authenticated:
@@ -74,8 +63,10 @@ class FetchKoboForms:
         return invalid_data
 
     def generate_valid_rows(self):
-        invalid_rows = self.fetch_bad_uids_data(self.xform_id_string)
-        all_rows = self.fetch_all_data(self.xform_id_string)
+        invalid_rows = self.fetch_bad_uids_data(
+            self.route_params_obj["xform_id_string"])
+        all_rows = self.fetch_all_data(
+            self.route_params_obj["xform_id_string"])
         valid_list = []
 
         for index, row_entry in all_rows.iterrows():
@@ -87,9 +78,11 @@ class FetchKoboForms:
         return valid_list
 
     def create_row_object(self):
-        uid_history = self.generate_invalid_rows(self.xform_id_string, True)
+        uid_history = self.generate_invalid_rows(
+            self.route_params_obj["xform_id_string"], True)
         valid_data = self.generate_valid_rows()
-        invalid_data = self.generate_invalid_rows(self.xform_id_string)
+        invalid_data = self.generate_invalid_rows(
+            self.route_params_obj["xform_id_string"])
 
         data = {
             "valid_data": valid_data,
@@ -98,9 +91,9 @@ class FetchKoboForms:
         }
 
         if not data.get("valid_data") and not data.get("invalid_data"):
-            return func.HttpResponse(json.dumps({"message": "no xform_id_string in dbs"}), headers=global_vars.HEADER, status_code=400)
+            return func.HttpResponse(json.dumps({"status": "error", "details": "no xform_id_string in db"}), headers=global_vars.HEADER, status_code=400)
         else:
-            return func.HttpResponse(json.dumps(data), headers=global_vars.HEADER, status_code=200)
+            return func.HttpResponse(json.dumps({"status": "success", "kobo_forms": data}), headers=global_vars.HEADER, status_code=201)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -109,16 +102,19 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         kobo_fetcher = FetchKoboForms(req)
 
-        if not kobo_fetcher.authenticated:
-            return func.HttpResponse(json.dumps(kobo_fetcher.auth_response), headers=global_vars.HEADER, status_code=401)
-        elif kobo_fetcher.invalid_params:
-            return func.HttpResponse("Missing query params", headers=global_vars.HEADER, status_code=400)
-        elif kobo_fetcher.token_missing:
-            return func.HttpResponse("Token missing", headers=global_vars.HEADER, status_code=400)
+        # authenticate user based on token
+        if any([not kobo_fetcher.authenticated, kobo_fetcher.invalid_params, kobo_fetcher.token_missing]):
+            return initializer.get_response(kobo_fetcher.authenticated, kobo_fetcher.auth_response,
+                                            kobo_fetcher.invalid_params, kobo_fetcher.token_missing, False)
         else:
             return kobo_fetcher.create_row_object()
 
-    except Exception:
-        error = traceback.format_exc()
-        logging.error(error)
-        return func.HttpResponse(error, status_code=500)
+    except Exception as error:
+        logging.info("program encountered exception: " +
+                     traceback.format_exc())
+        logging.exception(error)
+        return func.HttpResponse(
+            json.dumps({"status": "error", "details": traceback.format_exc()}),
+            status_code=500,
+            headers=global_vars.HEADER
+        )

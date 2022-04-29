@@ -12,7 +12,7 @@ HEADER = {'content-type': 'application/json'}
 # method to fetch the Auth0 management API token
 
 
-def get_token():
+def get_management_token():
     # payload and header
     auth0_payload = os.environ["AUTH0_PAYLOAD"]
     auth0_headers = HEADER
@@ -53,6 +53,8 @@ def get_users(management_api_token):
 
 
 def get_github_tokens(auth0_users_json_data, github_user):
+    github_user_token = None
+    github_org_owner_token = None
     for user in auth0_users_json_data:
         if user.get("nickname") == github_user:
             github_user_token = user.get("identities")[
@@ -65,7 +67,7 @@ def get_github_tokens(auth0_users_json_data, github_user):
 
 
 def generate_auth0_tokens(github_user):
-    management_api_token = get_token()
+    management_api_token = get_management_token()
     auth0_users_json_data = get_users(management_api_token)
 
     return get_github_tokens(auth0_users_json_data, github_user)

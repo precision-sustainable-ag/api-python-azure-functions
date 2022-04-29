@@ -9,7 +9,7 @@
       "methods": [
         "delete"
       ],
-      "route": "shadow/invalid_row_table_pairs/{uid}"
+      "route": "shadowdb/invalid_row_table_pairs/{uid}"
     },
     {
       "type": "http",

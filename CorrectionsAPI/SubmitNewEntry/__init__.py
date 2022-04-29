@@ -5,44 +5,20 @@ import traceback
 
 import azure.functions as func
 
-from ..SharedFunctions import authenticator, db_connectors, global_vars
+from SharedFunctions import db_connectors, global_vars, initializer
 
 
 class SubmitNewEntry:
     def __init__(self, req):
-        # get params
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            self.data = None
-            self.asset_name = None
-            self.id = None
-            self.xform_id_string = None
-            self.uid = None
-        else:
-            self.data = req_body.get('data')
-            self.asset_name = req_body.get('asset_name')
-            self.id = req_body.get('id')
-            self.xform_id_string = req_body.get('xform_id_string')
-            self.uid = req_body.get('uid')
+        initial_state = initializer.initilize(
+            route_params=None, body_params=["data", "asset_name", "id", "xform_id_string", "uid"], req=req)
 
-        # get token
-        try:
-            self.token = req.headers.__http_headers__["authorization"].split(" ")[
-                1]
-            self.token_missing = True if self.token is None else False
-        except KeyError:
-            self.token_missing = True
-
-        # check for missing missing params
-        if None in [self.data, self.asset_name, self.id, self.xform_id_string, self.uid]:
-            self.invalid_params = True
-        else:
-            self.invalid_params = False
-
-        # authenticate
-        self.authenticated, self.auth_response = authenticator.authenticate(
-            self.token)
+        self.body_params_obj = initial_state["body_params_obj"]
+        self.token = initial_state["token"]
+        self.token_missing = initial_state["token"] == None
+        self.authenticated = initial_state["authenticated"]
+        self.auth_response = initial_state["auth_response"]
+        self.invalid_params = initial_state["body_params_obj"] == None
 
         # connect to dbs
         if self.authenticated:
@@ -54,7 +30,7 @@ class SubmitNewEntry:
     def insert_new_form(self):
         sql_string = "INSERT INTO kobo (id, asset_name, data, xform_id_string) VALUES (%s, %s, %s, %s)"
         self.mysql_cur.execute(
-            sql_string, (self.id, self.asset_name, self.data, self.xform_id_string))
+            sql_string, (self.body_params_obj["id"], self.body_params_obj["asset_name"], self.body_params_obj["data"], self.body_params_obj["xform_id_string"]))
 
         self.mysql_con.commit()
 
@@ -62,7 +38,7 @@ class SubmitNewEntry:
 
     def set_resolved(self):
         sql_string = "UPDATE invalid_row_table_pairs SET resolved = 1 WHERE uid = %s"
-        self.shadow_cur.execute(sql_string, (self.uid,))
+        self.shadow_cur.execute(sql_string, (self.body_params_obj["uid"],))
 
         return self.shadow_cur.rowcount
 
@@ -72,15 +48,16 @@ class SubmitNewEntry:
 
         if insert_row_count == 0 or resolved_row_count == 0:
             if insert_row_count == 0 and resolved_row_count == 0:
-                return_text = "Failed to insert and set resolved"
+                return_text = "failed to insert and set resolved"
             elif insert_row_count == 0:
-                return_text = "Failed to insert"
+                return_text = "failed to insert %s %s %s %s" % (
+                    self.body_params_obj["id"], self.body_params_obj["asset_name"], self.body_params_obj["data"], self.body_params_obj["xform_id_string"])
             else:
-                return_text = "Failed to set resolved"
+                return_text = "failed to set resolved for %s" % self.body_params_obj["uid"]
 
-            return func.HttpResponse(return_text, headers=global_vars.HEADER, status_code=400)
+            return func.HttpResponse(json.dumps({"status": "error", "details": return_text}), headers=global_vars.HEADER, status_code=400)
         else:
-            return func.HttpResponse("Successfully inserted new entry", headers=global_vars.HEADER, status_code=201)
+            return func.HttpResponse(json.dumps({"status": "success", "details": "successfully inserted new entry with id = %s asset_name = %s data = %s xform_id_string = %s" % (self.body_params_obj["id"], self.body_params_obj["asset_name"], self.body_params_obj["data"], self.body_params_obj["xform_id_string"])}), headers=global_vars.HEADER, status_code=201)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -89,16 +66,19 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         submittor = SubmitNewEntry(req)
 
-        if not submittor.authenticated:
-            return func.HttpResponse(json.dumps(submittor.auth_response), headers=global_vars.HEADER, status_code=401)
-        elif submittor.invalid_params:
-            return func.HttpResponse("Missing query params", headers=global_vars.HEADER, status_code=400)
-        elif submittor.token_missing:
-            return func.HttpResponse("Token missing", headers=global_vars.HEADER, status_code=400)
+        # authenticate user based on token
+        if any([not submittor.authenticated, submittor.invalid_params, submittor.token_missing]):
+            return initializer.get_response(submittor.authenticated, submittor.auth_response,
+                                            submittor.invalid_params, submittor.token_missing, False)
         else:
             return submittor.submit_new_entry()
 
-    except Exception:
-        error = traceback.format_exc()
-        logging.error(error)
-        return func.HttpResponse(error, status_code=500)
+    except Exception as error:
+        logging.info("program encountered exception: " +
+                     traceback.format_exc())
+        logging.exception(error)
+        return func.HttpResponse(
+            json.dumps({"status": "error", "details": traceback.format_exc()}),
+            status_code=500,
+            headers=global_vars.HEADER
+        )
