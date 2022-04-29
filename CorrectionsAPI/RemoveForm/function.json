@@ -7,9 +7,9 @@
       "direction": "in",
       "name": "req",
       "methods": [
-        "get",
-        "post"
-      ]
+        "delete"
+      ],
+      "route": "shadow/invalid_row_table_pairs/{uid}"
     },
     {
       "type": "http",
