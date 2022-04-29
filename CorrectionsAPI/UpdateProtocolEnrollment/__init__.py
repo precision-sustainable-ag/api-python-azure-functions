@@ -6,39 +6,21 @@ import traceback
 import azure.functions as func
 from psycopg2 import sql
 
-from ..SharedFunctions import authenticator, db_connectors, global_vars
+from SharedFunctions import authenticator, db_connectors, global_vars, initializer
 
 
 class UpdateProtocolEnrollment:
     def __init__(self, req):
-        # get params from route
-        self.code = req.route_params.get('code')
+        initial_state = initializer.initilize(
+            route_params=["code"], body_params=["protocols"], req=req)
 
-        # get params
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            pass
-        else:
-            self.protocols = req_body.get('protocols')
-
-        # get token
-        try:
-            self.token = req.headers.__http_headers__["authorization"].split(" ")[
-                1]
-            self.token_missing = True if self.token is None else False
-        except KeyError:
-            self.token_missing = True
-
-        # check for missing missing params
-        if None in [self.code, self.protocols]:
-            self.invalid_params = True
-        else:
-            self.invalid_params = False
-
-        # authenticate
-        self.authenticated, self.auth_response = authenticator.authenticate(
-            self.token)
+        self.route_params_obj = initial_state["route_params_obj"]
+        self.body_params_obj = initial_state["body_params_obj"]
+        self.token = initial_state["token"]
+        self.token_missing = initial_state["token"] == None
+        self.authenticated = initial_state["authenticated"]
+        self.auth_response = initial_state["auth_response"]
+        self.invalid_params = initial_state["route_params_obj"] is None or initial_state["body_params_obj"] is None
 
         # connect to dbs
         if self.authenticated:
@@ -50,7 +32,7 @@ class UpdateProtocolEnrollment:
         update_prod_query = sql.SQL("UPDATE {table} SET {values} WHERE {identifiers}").format(
             table=sql.Identifier("protocol_enrollment"),
             values=sql.SQL(', ').join(
-                sql.Composed([sql.Identifier(k), sql.SQL(" = "), sql.Placeholder(k)]) for k in self.protocols.keys()
+                sql.Composed([sql.Identifier(k), sql.SQL(" = "), sql.Placeholder(k)]) for k in self.body_params_obj["protocols"].keys()
             ),
             identifiers=sql.SQL('').join(
                 sql.Composed(
@@ -58,15 +40,15 @@ class UpdateProtocolEnrollment:
             ),
         )
 
-        update_prod_values = self.protocols
-        update_prod_values["code"] = self.code
+        update_prod_values = self.body_params_obj["protocols"]
+        update_prod_values["code"] = self.route_params_obj["code"]
 
         self.crown_cur.execute(update_prod_query, update_prod_values)
 
         if self.crown_cur.rowcount == 0:
-            return func.HttpResponse("Failed to update protocol enrollment", headers=global_vars.HEADER, status_code=400)
+            return func.HttpResponse(json.dumps({"status": "error", "details": "failed to update protocol enrollment"}), headers=global_vars.HEADER, status_code=400)
         else:
-            return func.HttpResponse("Successfully updated protocol_enrollment for code {} to {}".format(self.code, json.dumps(self.protocols)), headers={'content-type': 'application/json'}, status_code=201)
+            return func.HttpResponse(json.dumps({"status": "success", "details": "Successfully updated protocol_enrollment for code {} to {}".format(self.route_params_obj["code"], json.dumps(self.body_params_obj["protocols"]))}), headers={'content-type': 'application/json'}, status_code=201)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -75,16 +57,19 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         protocol_updater = UpdateProtocolEnrollment(req)
 
-        if not protocol_updater.authenticated:
-            return func.HttpResponse(json.dumps(protocol_updater.auth_response), headers=global_vars.HEADER, status_code=401)
-        elif protocol_updater.invalid_params:
-            return func.HttpResponse("Missing query params", headers=global_vars.HEADER, status_code=400)
-        elif protocol_updater.token_missing:
-            return func.HttpResponse("Token missing", headers=global_vars.HEADER, status_code=400)
+        # authenticate user based on token
+        if any([not protocol_updater.authenticated, protocol_updater.invalid_params, protocol_updater.token_missing]):
+            return initializer.get_response(protocol_updater.authenticated, protocol_updater.auth_response,
+                                            protocol_updater.invalid_params, protocol_updater.token_missing, False)
         else:
             return protocol_updater.update_producer()
 
-    except Exception:
-        error = traceback.format_exc()
-        logging.error(error)
-        return func.HttpResponse(error, status_code=500)
+    except Exception as error:
+        logging.info("program encountered exception: " +
+                     traceback.format_exc())
+        logging.exception(error)
+        return func.HttpResponse(
+            json.dumps({"status": "error", "details": traceback.format_exc()}),
+            status_code=500,
+            headers=global_vars.HEADER
+        )

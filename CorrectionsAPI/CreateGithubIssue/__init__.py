@@ -5,52 +5,32 @@ import requests
 
 import azure.functions as func
 
-from ..SharedFunctions import authenticator, auth0_functions, global_vars
+from SharedFunctions import authenticator, auth0_functions, global_vars, initializer
 
 
 # github issues class to handle actions on github issues
 class CreateGithubIssue:
     # constructor sets the user variable
     def __init__(self, req):
-        # get params from route
-        self.user = req.route_params.get('user')
+        initial_state = initializer.initilize(
+            route_params=["user"], body_params=["title", "body", "assignees", "labels"], req=req)
 
-        # get params from body
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            self.title = None
-            self.body = None
-            self.assignees = None
-            self.labels = None
-        else:
-            self.title = req_body.get('title')
-            self.body = req_body.get('body')
-            self.assignees = req_body.get('assignees')
-            self.labels = req_body.get('labels')
-
-        # get token
-        try:
-            self.token = req.headers.__http_headers__["authorization"].split(" ")[
-                1]
-            self.token_missing = True if self.token is None else False
-        except KeyError:
-            self.token_missing = True
-
-        # check for missing missing params
-        if None in [self.title, self.body, self.assignees, self.labels]:
-            self.invalid_params = True
-        else:
-            self.invalid_params = False
-
-        # authenticate
-        self.authenticated, self.auth_response = authenticator.authenticate(
-            self.token)
+        self.route_params_obj = initial_state["route_params_obj"]
+        self.body_params_obj = initial_state["body_params_obj"]
+        self.token = initial_state["token"]
+        self.token_missing = initial_state["token"] == None
+        self.authenticated = initial_state["authenticated"]
+        self.auth_response = initial_state["auth_response"]
+        self.invalid_params = initial_state["route_params_obj"] == None or initial_state["body_params_obj"] == None
 
         # get github tokens
-        if self.authenticated:
+        if self.authenticated and not self.invalid_params:
             self.github_user_token, self.github_org_owner_token = auth0_functions.generate_auth0_tokens(
-                self.user)
+                self.route_params_obj.get("user"))
+
+            self.invalid_user = True if self.github_user_token is None or self.github_org_owner_token is None else False
+        else:
+            self.invalid_user = True
 
     # method to make an issue using a specific users github token
     def create_github_issue(self):
@@ -67,27 +47,26 @@ class CreateGithubIssue:
 
         # Create our issue working properly, just need to add labels etc
         data = {
-            'title': self.title,
-            'body': self.body,
-            'assignees': self.assignees,
-            'labels': self.labels
+            'title': self.body_params_obj.get("title"),
+            'body': self.body_params_obj.get("body"),
+            'assignees': self.body_params_obj.get("assignees"),
+            'labels': self.body_params_obj.get("labels")
         }
         payload = json.dumps(data)
         # Add the issue to our repository
         response = requests.request("POST", url, data=payload, headers=headers)
 
         if response.status_code == 201:
-            logging.info('Successfully created issue "%s"' % self.title)
             return func.HttpResponse(
-                json.dumps({"Message": "Successfully created issue"}),
+                json.dumps(
+                    {"status": "success", "details": "successfully created issue"}),
                 status_code=201,
                 headers=global_vars.HEADER
             )
         else:
-            logging.info('Could not create Issue "%s"' % self.title)
             return func.HttpResponse(
                 json.dumps(
-                    {"Message": "Could not create issue. Error: " + response.content.decode()}),
+                    {"status": "error", "details": "could not create issue. Error: " + response.content.decode()}),
                 status_code=400,
                 headers=global_vars.HEADER
             )
@@ -103,21 +82,18 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         issue_creator = CreateGithubIssue(req)
 
         # authenticate user based on token
-        if not issue_creator.authenticated:
-            return func.HttpResponse(json.dumps(issue_creator.auth_response), headers=global_vars.HEADER, status_code=401)
-        elif issue_creator.invalid_params:
-            return func.HttpResponse("Missing query params", headers=global_vars.HEADER, status_code=400)
-        elif issue_creator.token_missing:
-            return func.HttpResponse("Token missing", headers=global_vars.HEADER, status_code=400)
+        if any([not issue_creator.authenticated, issue_creator.invalid_params, issue_creator.token_missing, issue_creator.invalid_user]):
+            return initializer.get_response(issue_creator.authenticated, issue_creator.auth_response,
+                                            issue_creator.invalid_params, issue_creator.token_missing, issue_creator.invalid_user)
         else:
             return issue_creator.create_github_issue()
 
     except Exception as error:
-        logging.info("Program encountered exception: " +
+        logging.info("program encountered exception: " +
                      traceback.format_exc())
         logging.exception(error)
         return func.HttpResponse(
-            json.dumps({"Message": traceback.format_exc()}),
+            json.dumps({"status": "error", "details": traceback.format_exc()}),
             status_code=500,
             headers=global_vars.HEADER
         )
