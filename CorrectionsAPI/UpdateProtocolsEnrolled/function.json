@@ -7,7 +7,6 @@
       "direction": "in",
       "name": "req",
       "methods": [
-        "get",
         "post"
       ],
       "route": "crowndb/site_information/{code}/protocols_enrolled"
