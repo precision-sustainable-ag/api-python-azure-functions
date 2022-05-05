@@ -12,7 +12,7 @@ from SharedFunctions import authenticator, db_connectors, global_vars, initializ
 class UpdateProtocolEnrollment:
     def __init__(self, req):
         initial_state = initializer.initilize(
-            route_params=["code"], body_params=["protocols"], req=req)
+            route_params=["code"], body_params=["protocols_enrolled"], req=req)
 
         self.route_params_obj = initial_state["route_params_obj"]
         self.body_params_obj = initial_state["body_params_obj"]
@@ -29,26 +29,15 @@ class UpdateProtocolEnrollment:
                 self.environment)
 
     def update_producer(self):
-        update_prod_query = sql.SQL("UPDATE {table} SET {values} WHERE {identifiers}").format(
-            table=sql.Identifier("protocol_enrollment"),
-            values=sql.SQL(', ').join(
-                sql.Composed([sql.Identifier(k), sql.SQL(" = "), sql.Placeholder(k)]) for k in self.body_params_obj["protocols"].keys()
-            ),
-            identifiers=sql.SQL('').join(
-                sql.Composed(
-                    [sql.Identifier("code"), sql.SQL(" = "), sql.Placeholder("code")])
-            ),
-        )
+        update_prod_query = "UPDATE site_information SET protocols_enrolled = %s WHERE code = %s"
 
-        update_prod_values = self.body_params_obj["protocols"]
-        update_prod_values["code"] = self.route_params_obj["code"]
-
-        self.crown_cur.execute(update_prod_query, update_prod_values)
+        self.crown_cur.execute(
+            update_prod_query, (self.body_params_obj["protocols_enrolled"], self.route_params_obj["code"]))
 
         if self.crown_cur.rowcount == 0:
-            return func.HttpResponse(json.dumps({"status": "error", "details": "failed to update protocol enrollment"}), headers=global_vars.HEADER, status_code=400)
+            return func.HttpResponse(json.dumps({"status": "error", "details": "failed to update protocols_enrolled for code {} to {}".format(self.route_params_obj["code"], self.body_params_obj["protocols_enrolled"])}), headers=global_vars.HEADER, status_code=400)
         else:
-            return func.HttpResponse(json.dumps({"status": "success", "details": "successfully updated protocol_enrollment for code {} to {}".format(self.route_params_obj["code"], json.dumps(self.body_params_obj["protocols"]))}), headers={'content-type': 'application/json'}, status_code=201)
+            return func.HttpResponse(json.dumps({"status": "success", "details": "successfully updated protocols_enrolled for code {} to {}".format(self.route_params_obj["code"], self.body_params_obj["protocols_enrolled"])}), headers={'content-type': 'application/json'}, status_code=201)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
