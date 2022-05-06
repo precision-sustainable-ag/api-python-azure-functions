@@ -1,85 +1,61 @@
 import json
 import logging
 import os
-import sys
 import traceback
 
 import azure.functions as func
-import mysql.connector
-import MySQLdb
-import pandas as pd
-import psycopg2
-import pymysql
-import sqlalchemy
-from psycopg2 import sql
 
-from ..SharedFunctions import authenticator
-
-pymysql.install_as_MySQLdb()
+from SharedFunctions import authenticator, db_connectors, global_vars, initializer
 
 
 class SubmitNewEntry:
     def __init__(self, req):
-        self.connect_to_crown_live()
+        initial_state = initializer.initilize(
+            route_params=["producer_id", "code"], body_params=None, req=req)
 
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            pass
-        else:
-            self.token = req_body.get('token')
-            self.producer_id = req_body.get('producer_id')
-            self.code = req_body.get('code')
+        self.route_params_obj = initial_state["route_params_obj"]
+        self.token = initial_state["token"]
+        self.token_missing = initial_state["token"] == None
+        self.authenticated = initial_state["authenticated"]
+        self.auth_response = initial_state["auth_response"]
+        self.invalid_params = initial_state["route_params_obj"] is None
 
-    def authenticate(self):
-        authenticated, response = authenticator.authenticate(self.token)
-        if not authenticated:
-            return False, response
-        else:
-            return True, response
-
-    def connect_to_crown_live(self):
-        postgres_host = os.environ.get('LIVE_HOST')
-        postgres_dbname = os.environ.get('LIVE_CROWN_DBNAME')
-        postgres_user = os.environ.get('LIVE_USER')
-        postgres_password = os.environ.get('LIVE_PASSWORD')
-        postgres_sslmode = os.environ.get('LIVE_SSLMODE')
-
-        # Make postgres connections
-        postgres_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(
-            postgres_host, postgres_user, postgres_dbname, postgres_password, postgres_sslmode)
-        # print(postgres_con_string)
-        self.postgres_con = psycopg2.connect(postgres_con_string)
-        self.postgres_cur = self.postgres_con.cursor()
-        self.postgres_con.autocommit = True
-
-        postgres_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(
-            postgres_user, postgres_password, postgres_host, postgres_dbname)
-        self.postgres_engine = sqlalchemy.create_engine(postgres_engine_string)
-
-        print("connected to crown live")
+        # connect to dbs
+        if self.authenticated:
+            self.environment = os.environ.get('AZURE_FUNCTIONS_ENVIRONMENT')
+            self.crown_con, self.crown_cur, self.crown_engine = db_connectors.connect_to_crown(
+                self.environment)
 
     def update_producer(self):
         sql_string = "UPDATE site_information SET producer_id = %s WHERE code = %s"
-        self.postgres_cur.execute(sql_string, (self.producer_id, self.code))
-        self.postgres_con.commit()
+
+        try:
+            self.crown_cur.execute(
+                sql_string, (self.route_params_obj["producer_id"], self.route_params_obj["code"]))
+            return func.HttpResponse(json.dumps({"status": "success", "details": "successfully updated producer {} to be code {}".format(self.route_params_obj["producer_id"], self.route_params_obj["code"])}), headers={'content-type': 'application/json'}, status_code=201)
+        except Exception:
+            return func.HttpResponse(json.dumps({"status": "error", "details": "failed to update producer"}), headers=global_vars.HEADER, status_code=400)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
     try:
-        sne = SubmitNewEntry(req)
+        producer_updater = SubmitNewEntry(req)
 
-        authenticated, response = sne.authenticate()
-        if not authenticated:
-            return func.HttpResponse(json.dumps(response), headers={'content-type': 'application/json'}, status_code=400)
+        # authenticate user based on token
+        if any([not producer_updater.authenticated, producer_updater.invalid_params, producer_updater.token_missing]):
+            return initializer.get_response(producer_updater.authenticated, producer_updater.auth_response,
+                                            producer_updater.invalid_params, producer_updater.token_missing, False)
+        else:
+            return producer_updater.update_producer()
 
-        sne.update_producer()
-
-        return func.HttpResponse(body="Successfully updated producer", headers={'content-type': 'application/json'}, status_code=201)
-
-    except Exception:
-        error = traceback.format_exc()
-        logging.error(error)
-        return func.HttpResponse(error, status_code=400)
+    except Exception as error:
+        logging.info("program encountered exception: " +
+                     traceback.format_exc())
+        logging.exception(error)
+        return func.HttpResponse(
+            json.dumps({"status": "error", "details": traceback.format_exc()}),
+            status_code=500,
+            headers=global_vars.HEADER
+        )

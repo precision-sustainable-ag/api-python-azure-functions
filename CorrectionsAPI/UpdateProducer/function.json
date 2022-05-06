@@ -7,9 +7,9 @@
       "direction": "in",
       "name": "req",
       "methods": [
-        "get",
         "post"
-      ]
+      ],
+      "route": "crowndb/site_information/producers/{producer_id}/{code}"
     },
     {
       "type": "http",

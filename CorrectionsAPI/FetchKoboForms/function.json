@@ -7,9 +7,9 @@
       "direction": "in",
       "name": "req",
       "methods": [
-        "get",
-        "post"
-      ]
+        "get"
+      ],
+      "route": "tech-dashboard/kobo/{xform_id_string}"
     },
     {
       "type": "http",
