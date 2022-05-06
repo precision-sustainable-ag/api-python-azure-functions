@@ -1,80 +1,60 @@
 import json
 import logging
 import os
-import sys
 import traceback
 
 import azure.functions as func
-import mysql.connector
-import pandas as pd
-import psycopg2
-import sqlalchemy
-from psycopg2 import sql
 
-from ..SharedFunctions import authenticator
+from SharedFunctions import authenticator, db_connectors, global_vars, initializer
 
 
-class SubmitNewEntry:
+class RemoveForm:
     def __init__(self, req):
-        self.connect_to_shadow_live()
+        initial_state = initializer.initilize(
+            route_params=["uid"], body_params=None, req=req)
 
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            pass
-        else:
-            self.token = req_body.get('token')
-            self.uid = req_body.get('uid')
-            # print(self.uid)
+        self.route_params_obj = initial_state["route_params_obj"]
+        self.token = initial_state["token"]
+        self.token_missing = initial_state["token"] == None
+        self.authenticated = initial_state["authenticated"]
+        self.auth_response = initial_state["auth_response"]
+        self.invalid_params = initial_state["route_params_obj"] is None
 
-    def authenticate(self):
-        authenticated, response = authenticator.authenticate(self.token)
-        if not authenticated:
-            return False, response
-        else:
-            return True, response
-
-    def connect_to_shadow_live(self):
-        postgres_host = os.environ.get('LIVE_HOST')
-        postgres_dbname = os.environ.get('LIVE_SHADOW_DBNAME')
-        postgres_user = os.environ.get('LIVE_USER')
-        postgres_password = os.environ.get('LIVE_PASSWORD')
-        postgres_sslmode = os.environ.get('LIVE_SSLMODE')
-
-        # Make postgres connections
-        postgres_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(
-            postgres_host, postgres_user, postgres_dbname, postgres_password, postgres_sslmode)
-        # print(postgres_con_string)
-        self.shadow_con = psycopg2.connect(postgres_con_string)
-        self.shadow_cur = self.shadow_con.cursor()
-        self.shadow_con.autocommit = True
-
-        postgres_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(
-            postgres_user, postgres_password, postgres_host, postgres_dbname)
-        self.shadow_engine = sqlalchemy.create_engine(postgres_engine_string)
-
-        print("connected to shadow live")
+        # connect to dbs
+        if self.authenticated:
+            self.environment = os.environ.get('AZURE_FUNCTIONS_ENVIRONMENT')
+            self.shadow_con, self.shadow_cur, self.shadow_engine = db_connectors.connect_to_shadow(
+                self.environment)
 
     def set_resolved(self):
         sql_string = "UPDATE invalid_row_table_pairs SET resolved = 1 WHERE uid = %s"
-        self.shadow_cur.execute(sql_string, (self.uid,))
+        self.shadow_cur.execute(sql_string, (self.route_params_obj["uid"],))
+
+        if self.shadow_cur.rowcount == 0:
+            return func.HttpResponse(json.dumps({"status": "error", "details": "failed to remove form"}), headers=global_vars.HEADER, status_code=400)
+        else:
+            return func.HttpResponse(json.dumps({"status": "success", "details": "successfully deleted row {}".format(self.route_params_obj["uid"])}), headers=global_vars.HEADER, status_code=201)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
     try:
-        sne = SubmitNewEntry(req)
+        remover = RemoveForm(req)
 
-        authenticated, response = sne.authenticate()
-        if not authenticated:
-            return func.HttpResponse(json.dumps(response), headers={'content-type': 'application/json'}, status_code=400)
+        # authenticate user based on token
+        if any([not remover.authenticated, remover.invalid_params, remover.token_missing]):
+            return initializer.get_response(remover.authenticated, remover.auth_response,
+                                            remover.invalid_params, remover.token_missing, False)
+        else:
+            return remover.set_resolved()
 
-        sne.set_resolved()
-
-        return func.HttpResponse(body="Successfully inserted new entry", headers={'content-type': 'application/json'}, status_code=201)
-
-    except Exception:
-        error = traceback.format_exc()
-        logging.error(error)
-        return func.HttpResponse(error, status_code=400)
+    except Exception as error:
+        logging.info("program encountered exception: " +
+                     traceback.format_exc())
+        logging.exception(error)
+        return func.HttpResponse(
+            json.dumps({"status": "error", "details": traceback.format_exc()}),
+            status_code=500,
+            headers=global_vars.HEADER
+        )

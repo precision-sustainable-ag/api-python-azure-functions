@@ -9,7 +9,7 @@
       "methods": [
         "post"
       ],
-      "route": "tech-dashboard/kobo"
+      "route": "precision-sustainable-ag/repos/data_corrections/issues/{user}"
     },
     {
       "type": "http",
