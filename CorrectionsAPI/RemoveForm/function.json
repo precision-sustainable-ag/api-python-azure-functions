@@ -7,9 +7,9 @@
       "direction": "in",
       "name": "req",
       "methods": [
-        "delete"
-      ],
-      "route": "shadowdb/invalid_row_table_pairs/{uid}"
+        "get",
+        "post"
+      ]
     },
     {
       "type": "http",

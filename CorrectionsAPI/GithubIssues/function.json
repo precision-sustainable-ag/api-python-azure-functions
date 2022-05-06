@@ -7,9 +7,9 @@
       "direction": "in",
       "name": "req",
       "methods": [
-        "get"
-      ],
-      "route": "shadowdb/editable_list/{version}"
+        "get",
+        "post"
+      ]
     },
     {
       "type": "http",

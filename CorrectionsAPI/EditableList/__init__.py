@@ -14,7 +14,7 @@ from psycopg2 import sql
 from ..SharedFunctions import authenticator
 
 
-class SubmitNewEntry:
+class EditableList:
     def __init__(self, req):
         self.connect_to_shadow_live()
 
@@ -24,8 +24,7 @@ class SubmitNewEntry:
             pass
         else:
             self.token = req_body.get('token')
-            self.uid = req_body.get('uid')
-            # print(self.uid)
+            self.version = req_body.get('version')
 
     def authenticate(self):
         authenticated, response = authenticator.authenticate(self.token)
@@ -55,24 +54,35 @@ class SubmitNewEntry:
 
         print("connected to shadow live")
 
-    def set_resolved(self):
-        sql_string = "UPDATE invalid_row_table_pairs SET resolved = 1 WHERE uid = %s"
-        self.shadow_cur.execute(sql_string, (self.uid,))
+    def fetch_editable_list(self):
+        editable_list = pd.DataFrame(pd.read_sql(
+            "SELECT editable_list, entry_to_iterate, iterator_editable_list, table_names FROM editable_list_by_version WHERE version = '{}'".format(self.version), self.shadow_engine))
+        return editable_list
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
     try:
-        sne = SubmitNewEntry(req)
+        el = EditableList(req)
 
-        authenticated, response = sne.authenticate()
+        authenticated, response = el.authenticate()
         if not authenticated:
             return func.HttpResponse(json.dumps(response), headers={'content-type': 'application/json'}, status_code=400)
 
-        sne.set_resolved()
+        editable_list = el.fetch_editable_list()
 
-        return func.HttpResponse(body="Successfully inserted new entry", headers={'content-type': 'application/json'}, status_code=201)
+        if editable_list.empty:
+            return func.HttpResponse(json.dumps({"message": "no version in shadow db"}), headers={'content-type': 'application/json'}, status_code=400)
+
+        return_obj = {
+            "editable_list": editable_list.iloc[0].get("editable_list"),
+            "entry_to_iterate": editable_list.iloc[0].get("entry_to_iterate"),
+            "iterator_editable_list": editable_list.iloc[0].get("iterator_editable_list"),
+            "table_names": editable_list.iloc[0].get("table_names"),
+        }
+
+        return func.HttpResponse(body=json.dumps(return_obj), headers={'content-type': 'application/json'}, status_code=200)
 
     except Exception:
         error = traceback.format_exc()

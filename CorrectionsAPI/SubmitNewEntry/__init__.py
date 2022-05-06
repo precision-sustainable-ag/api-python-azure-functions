@@ -1,84 +1,112 @@
 import json
 import logging
 import os
+import sys
 import traceback
 
 import azure.functions as func
+import mysql.connector
+import MySQLdb
+import pandas as pd
+import psycopg2
+import pymysql
+import sqlalchemy
+from psycopg2 import sql
 
-from SharedFunctions import db_connectors, global_vars, initializer
+from ..SharedFunctions import authenticator
+
+pymysql.install_as_MySQLdb()
 
 
 class SubmitNewEntry:
     def __init__(self, req):
-        initial_state = initializer.initilize(
-            route_params=None, body_params=["data", "asset_name", "id", "xform_id_string", "uid"], req=req)
+        self.connect_to_shadow_live()
+        self.connect_to_mysql_live()
 
-        self.body_params_obj = initial_state["body_params_obj"]
-        self.token = initial_state["token"]
-        self.token_missing = initial_state["token"] == None
-        self.authenticated = initial_state["authenticated"]
-        self.auth_response = initial_state["auth_response"]
-        self.invalid_params = initial_state["body_params_obj"] == None
+        try:
+            req_body = req.get_json()
+        except ValueError:
+            pass
+        else:
+            self.token = req_body.get('token')
+            self.data = req_body.get('data')
+            self.asset_name = req_body.get('asset_name')
+            self.id = req_body.get('id')
+            self.xform_id_string = req_body.get('xform_id_string')
+            self.uid = req_body.get('uid')
+            # print(self.uid)
 
-        # connect to dbs
-        if self.authenticated:
-            self.environment = os.environ.get('AZURE_FUNCTIONS_ENVIRONMENT')
-            self.shadow_con, self.shadow_cur, self.shadow_engine = db_connectors.connect_to_shadow(
-                self.environment)
-            self.mysql_con, self.mysql_cur, self.mysql_engine = db_connectors.connect_to_mysql()
+    def authenticate(self):
+        authenticated, response = authenticator.authenticate(self.token)
+        if not authenticated:
+            return False, response
+        else:
+            return True, response
+
+    def connect_to_shadow_live(self):
+        postgres_host = os.environ.get('LIVE_HOST')
+        postgres_dbname = os.environ.get('LIVE_SHADOW_DBNAME')
+        postgres_user = os.environ.get('LIVE_USER')
+        postgres_password = os.environ.get('LIVE_PASSWORD')
+        postgres_sslmode = os.environ.get('LIVE_SSLMODE')
+
+        # Make postgres connections
+        postgres_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(
+            postgres_host, postgres_user, postgres_dbname, postgres_password, postgres_sslmode)
+        # print(postgres_con_string)
+        self.shadow_con = psycopg2.connect(postgres_con_string)
+        self.shadow_cur = self.shadow_con.cursor()
+        self.shadow_con.autocommit = True
+
+        postgres_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(
+            postgres_user, postgres_password, postgres_host, postgres_dbname)
+        self.shadow_engine = sqlalchemy.create_engine(postgres_engine_string)
+
+        print("connected to shadow live")
+
+    def connect_to_mysql_live(self):
+        mysql_host = os.environ.get('MYSQL_HOST')
+        mysql_dbname = os.environ.get('MYSQL_DBNAME')
+        mysql_user = os.environ.get('MYSQL_USER')
+        mysql_password = os.environ.get('MYSQL_PASSWORD')
+
+        self.mysql_con = pymysql.connect(user=mysql_user, database=mysql_dbname, host=mysql_host,
+                                         password=mysql_password, charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor)
+        self.mysql_cur = self.mysql_con.cursor()
+        self.mysql_con.autocommit = True
+
+        print("connected to mysql live")
 
     def insert_new_form(self):
         sql_string = "INSERT INTO kobo (id, asset_name, data, xform_id_string) VALUES (%s, %s, %s, %s)"
         self.mysql_cur.execute(
-            sql_string, (self.body_params_obj["id"], self.body_params_obj["asset_name"], self.body_params_obj["data"], self.body_params_obj["xform_id_string"]))
-
+            sql_string, (self.id, self.asset_name, self.data, self.xform_id_string))
+        # self.mysql_cur
         self.mysql_con.commit()
-
-        return self.mysql_cur.rowcount
 
     def set_resolved(self):
         sql_string = "UPDATE invalid_row_table_pairs SET resolved = 1 WHERE uid = %s"
-        self.shadow_cur.execute(sql_string, (self.body_params_obj["uid"],))
-
-        return self.shadow_cur.rowcount
-
-    def submit_new_entry(self):
-        insert_row_count = self.insert_new_form()
-        resolved_row_count = self.set_resolved()
-
-        if insert_row_count == 0 or resolved_row_count == 0:
-            if insert_row_count == 0 and resolved_row_count == 0:
-                return_text = "failed to insert and set resolved"
-            elif insert_row_count == 0:
-                return_text = "failed to insert %s %s %s %s" % (
-                    self.body_params_obj["id"], self.body_params_obj["asset_name"], self.body_params_obj["data"], self.body_params_obj["xform_id_string"])
-            else:
-                return_text = "failed to set resolved for %s" % self.body_params_obj["uid"]
-
-            return func.HttpResponse(json.dumps({"status": "error", "details": return_text}), headers=global_vars.HEADER, status_code=400)
-        else:
-            return func.HttpResponse(json.dumps({"status": "success", "details": "successfully inserted new entry with id = %s asset_name = %s data = %s xform_id_string = %s" % (self.body_params_obj["id"], self.body_params_obj["asset_name"], self.body_params_obj["data"], self.body_params_obj["xform_id_string"])}), headers=global_vars.HEADER, status_code=201)
+        self.shadow_cur.execute(sql_string, (self.uid,))
+        # self.mysql_cur
+        self.mysql_con.commit()
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
     try:
-        submittor = SubmitNewEntry(req)
+        sne = SubmitNewEntry(req)
 
-        # authenticate user based on token
-        if any([not submittor.authenticated, submittor.invalid_params, submittor.token_missing]):
-            return initializer.get_response(submittor.authenticated, submittor.auth_response,
-                                            submittor.invalid_params, submittor.token_missing, False)
-        else:
-            return submittor.submit_new_entry()
+        authenticated, response = sne.authenticate()
+        if not authenticated:
+            return func.HttpResponse(json.dumps(response), headers={'content-type': 'application/json'}, status_code=400)
 
-    except Exception as error:
-        logging.info("program encountered exception: " +
-                     traceback.format_exc())
-        logging.exception(error)
-        return func.HttpResponse(
-            json.dumps({"status": "error", "details": traceback.format_exc()}),
-            status_code=500,
-            headers=global_vars.HEADER
-        )
+        sne.insert_new_form()
+        sne.set_resolved()
+
+        return func.HttpResponse(body="Successfully inserted new entry", headers={'content-type': 'application/json'}, status_code=201)
+
+    except Exception:
+        error = traceback.format_exc()
+        logging.error(error)
+        return func.HttpResponse(error, status_code=400)

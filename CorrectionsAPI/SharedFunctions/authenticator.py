@@ -1,5 +1,8 @@
+import http.client
 import json
+import logging
 import os
+from functools import wraps
 
 from jose import jwt
 from six.moves.urllib.request import urlopen
