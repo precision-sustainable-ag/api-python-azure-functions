@@ -30,7 +30,7 @@ class FetchKoboForms:
 
     def fetch_bad_uids_data(self, xform_id_string):
         invalid_rows = pd.DataFrame(pd.read_sql(
-            "SELECT DISTINCT uid, err, data FROM invalid_row_table_pairs WHERE xform_id_string = '{}' AND resolved = 0".format(xform_id_string), self.shadow_engine))
+            "SELECT DISTINCT uid, err, data FROM invalid_row_table_pairs WHERE xform_id_string = '{}'".format(xform_id_string), self.shadow_engine))
         return invalid_rows
 
     def fetch_all_data(self, xform_id_string):
