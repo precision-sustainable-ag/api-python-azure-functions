@@ -1,10 +1,8 @@
-import http.client
-import json
 import os
+import requests
 
 #  setup connection
-auth0_connection = http.client.HTTPSConnection(
-    "psa-tech-dashboard.auth0.com")
+BASE_URL = "https://psa-tech-dashboard.auth0.com"
 
 # class variable to avoid repeating the same text
 HEADER = {'content-type': 'application/json'}
@@ -16,14 +14,13 @@ def get_management_token():
     # payload and header
     auth0_payload = os.environ["AUTH0_PAYLOAD"]
     auth0_headers = HEADER
+
     # request token
-    auth0_connection.request(
-        "POST", "/oauth/token", auth0_payload, auth0_headers)
-    auth0_token_res = auth0_connection.getresponse()
-    auth0_token_data = auth0_token_res.read()
+    auth0_token_res = requests.post(
+        BASE_URL + "/oauth/token", data=auth0_payload, headers=auth0_headers)
+
     # convert to json
-    json_auth0_token_data = auth0_token_data.decode('utf8')
-    auth0_token_json_data = json.loads(json_auth0_token_data)
+    auth0_token_json_data = auth0_token_res.json()
 
     management_api_token = auth0_token_json_data['access_token']
 
@@ -38,14 +35,11 @@ def get_users(management_api_token):
     auth0_users_headers = {'authorization': auth0_users_authorization}
 
     # request users
-    auth0_connection.request(
-        "GET", "/api/v2/users", headers=auth0_users_headers)
-    auth0_users_res = auth0_connection.getresponse()
-    auth0_users_data = auth0_users_res.read()
+    auth0_token_res = requests.get(
+        BASE_URL + "/api/v2/users", headers=auth0_users_headers)
 
     # convert to json
-    json_auth0_users_data = auth0_users_data.decode('utf8')
-    auth0_users_json_data = json.loads(json_auth0_users_data)
+    auth0_users_json_data = auth0_token_res.json()
 
     return auth0_users_json_data
 
