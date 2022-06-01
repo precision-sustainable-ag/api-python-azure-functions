@@ -64,7 +64,7 @@ def get_token(req):
     return token
 
 
-def initilize(req, route_params=None, body_params=None):
+def initialize(req, route_params=None, body_params=None):
     route_params_obj = get_route_params(
         route_params, req)
     body_params_obj = get_body_params(body_params, req)

@@ -4,14 +4,14 @@ from requests.structures import CaseInsensitiveDict
 import os
 import json
 
-from AddToProtocolEnrollment import main  # import the method we want to test
+from FetchWeeeds3D import main  # import the method we want to test
 from unittest import mock
 from SharedFunctions.set_environment_variables import set_variables
 # Note how the class name starts with Test
 
-CODE = "QUU"
+CODES = ["DET", "ABCDE"]
 
-URL = 'crowndb/site_information/{}/protocols_enrolled'.format(CODE)
+URL = 'weeds3d/videos'
 
 set_variables()
 token = os.environ["USER_TOKEN"]
@@ -32,7 +32,7 @@ class TestAddToTechnicians(unittest.TestCase):
         request = func.HttpRequest(
             method='POST',
             url=URL,
-            body=json.dumps({'code': CODE}).encode(),
+            body=json.dumps({'codes': CODES}).encode(),
             headers=HEADERS
         )
 
@@ -43,13 +43,13 @@ class TestAddToTechnicians(unittest.TestCase):
 
         assert response.status_code == 201
         assert json_response["status"] == "success"
-        assert CODE in json_response["details"]
+        assert len(json_response["files"]) > 0
 
     def test_bad_invalid_code(self):
         request = func.HttpRequest(
             method='POST',
             url=URL,
-            body=json.dumps({'code': 'XYZ'}).encode(),
+            body=json.dumps({'codes': ['XYZ']}).encode(),
             headers=HEADERS
         )
 
@@ -58,7 +58,7 @@ class TestAddToTechnicians(unittest.TestCase):
         print(json_response)
 
         assert response.status_code == 400
-        assert "failed to insert code" in json_response["details"]
+        assert "no files" in json_response["details"]
 
     def test_no_body_params(self):
         request = func.HttpRequest(
@@ -77,7 +77,7 @@ class TestAddToTechnicians(unittest.TestCase):
     def test_no_token(self):
         request = func.HttpRequest(
             method='POST',
-            body=json.dumps({'code': CODE}).encode(),
+            body=json.dumps({'code': CODES}).encode(),
             url=URL,
         )
 
@@ -91,7 +91,7 @@ class TestAddToTechnicians(unittest.TestCase):
     def test_expired_token(self):
         request = func.HttpRequest(
             method='POST',
-            body=json.dumps({'code': CODE}).encode(),
+            body=json.dumps({'code': CODES}).encode(),
             url=URL,
             headers=EXPIRED_HEADERS
         )

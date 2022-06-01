@@ -5,12 +5,12 @@ import traceback
 
 import azure.functions as func
 
-from SharedFunctions import authenticator, db_connectors, global_vars, initializer
+from SharedFunctions import db_connectors, global_vars, initializer
 
 
 class RemoveForm:
     def __init__(self, req):
-        initial_state = initializer.initilize(
+        initial_state = initializer.initialize(
             route_params=["uid"], body_params=None, req=req)
 
         self.route_params_obj = initial_state["route_params_obj"]

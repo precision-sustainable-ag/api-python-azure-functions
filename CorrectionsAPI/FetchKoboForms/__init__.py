@@ -6,12 +6,12 @@ import pandas as pd
 
 import azure.functions as func
 
-from SharedFunctions import authenticator, db_connectors, global_vars, initializer
+from SharedFunctions import db_connectors, global_vars, initializer
 
 
 class FetchKoboForms:
     def __init__(self, req):
-        initial_state = initializer.initilize(
+        initial_state = initializer.initialize(
             route_params=["xform_id_string"], body_params=None, req=req)
 
         self.route_params_obj = initial_state["route_params_obj"]
