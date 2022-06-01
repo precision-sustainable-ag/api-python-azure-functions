@@ -13,7 +13,7 @@ from SharedFunctions import auth0_functions, global_vars, initializer
 class CreateGithubComment:
     # constructor sets the user variable
     def __init__(self, req):
-        initial_state = initializer.initilize(
+        initial_state = initializer.initialize(
             route_params=["user", "number"], body_params=["comment"], req=req)
 
         self.route_params_obj = initial_state["route_params_obj"]

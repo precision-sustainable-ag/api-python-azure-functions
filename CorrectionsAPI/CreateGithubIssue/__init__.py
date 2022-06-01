@@ -5,14 +5,14 @@ import requests
 
 import azure.functions as func
 
-from SharedFunctions import authenticator, auth0_functions, global_vars, initializer
+from SharedFunctions import auth0_functions, global_vars, initializer
 
 
 # github issues class to handle actions on github issues
 class CreateGithubIssue:
     # constructor sets the user variable
     def __init__(self, req):
-        initial_state = initializer.initilize(
+        initial_state = initializer.initialize(
             route_params=["user"], body_params=["title", "body", "assignees", "labels"], req=req)
 
         self.route_params_obj = initial_state["route_params_obj"]

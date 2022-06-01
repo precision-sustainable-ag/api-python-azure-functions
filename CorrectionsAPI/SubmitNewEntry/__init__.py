@@ -10,7 +10,7 @@ from SharedFunctions import db_connectors, global_vars, initializer
 
 class SubmitNewEntry:
     def __init__(self, req):
-        initial_state = initializer.initilize(
+        initial_state = initializer.initialize(
             route_params=None, body_params=["data", "asset_name", "id", "xform_id_string", "uid"], req=req)
 
         self.body_params_obj = initial_state["body_params_obj"]

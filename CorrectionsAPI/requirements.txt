@@ -15,3 +15,5 @@ six
 python-jose
 pymysql
 mysqlclient
+azure-storage-blob
+

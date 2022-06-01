@@ -4,14 +4,13 @@ import os
 import traceback
 
 import azure.functions as func
-from psycopg2 import sql
 
-from SharedFunctions import authenticator, db_connectors, global_vars, initializer
+from SharedFunctions import db_connectors, global_vars, initializer
 
 
 class UpdateProtocolEnrollment:
     def __init__(self, req):
-        initial_state = initializer.initilize(
+        initial_state = initializer.initialize(
             route_params=["code"], body_params=["protocols_enrolled"], req=req)
 
         self.route_params_obj = initial_state["route_params_obj"]
