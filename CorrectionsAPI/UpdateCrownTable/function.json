@@ -9,7 +9,7 @@
       "methods": [
         "post"
       ],
-      "route": "weeds3d/videos"
+      "route": "crowndb/{table}"
     },
     {
       "type": "http",
