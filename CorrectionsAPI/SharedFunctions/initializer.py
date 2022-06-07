@@ -4,7 +4,7 @@ import json
 from SharedFunctions import global_vars, authenticator
 
 
-def get_response(authenticated, auth_response, invalid_params, token_missing, invalid_user):
+def get_response(authenticated, auth_response, invalid_params, token_missing, invalid_user, missing_minimum_identifiers=False):
     # authenticate user based on token
     errors = []
     status_code = 400
@@ -14,6 +14,8 @@ def get_response(authenticated, auth_response, invalid_params, token_missing, in
         errors.append("missing query params")
     if invalid_user:
         errors.append("invalid github nickname")
+    if missing_minimum_identifiers:
+        errors.append("missing minimum identifiers for table")
     if not authenticated:
         errors.append(auth_response)
         status_code = 401
