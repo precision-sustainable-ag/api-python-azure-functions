@@ -35,7 +35,7 @@ class FetchWeeds3D:
             weeds3d = blob_service_client.get_container_client("weeds3d")
             for blob in weeds3d.list_blobs(name_starts_with="PSA-OnFarm"):
                 for code in self.body_params_obj["codes"]:
-                    if code in blob.name:
+                    if "_" + code + "_" in blob.name:
                         split_file = blob.name.split("_")
 
                         file_list.append(
