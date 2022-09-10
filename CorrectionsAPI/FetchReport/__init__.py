@@ -1,5 +1,7 @@
 import json
+import os
 import logging
+from turtle import color
 import requests
 import os
 import traceback
@@ -11,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 import matplotlib.pyplot as plt 
 
 from SharedFunctions import db_connectors, global_vars, initializer
-
+from FetchReport import biomass, moisture, precipitation, crop_yield
 
 class FetchReport:
     def __init__(self, req):
@@ -58,90 +60,18 @@ class FetchReport:
 
         self.requested_site = self.route_params_obj.get("site")
 
-    def fetch_biomass(self, affiliation):
-        api_key = os.environ["x-api-key"]
-        api_header = {'x-api-key' : api_key}
-        biomass_url= "https://api.precisionsustainableag.org/onfarm/biomass"
-        affiliations = ",".join(self.region[self.aff_2_region[affiliation]])
-
-        # request biomass data
-        data = requests.get(
-        biomass_url, params={'affiliation':affiliations}, headers=api_header)
-
-        biomass_data = pd.DataFrame(data.json())
-        biomass_data['biomass_mean'] = biomass_data[['uncorrected_cc_dry_biomass_kg_ha',
-             'ash_corrected_cc_dry_biomass_kg_ha']].mean(axis=1)
-        biomass_data['biomass_mean'].fillna(0, inplace=True)
-
-        # print(biomass_data[biomass_data['code']=='BIG'].index.values)
-        # report_data.sort_values(by=['biomass_mean'], inplace=True)
-        # report_data.reset_index(drop=True, inplace=True)
-
-        biomass_data['Rank'] = biomass_data['biomass_mean'].rank(ascending = 1)
-        biomass_data.sort_values(by=['biomass_mean'], inplace=True)
-        site_biomass = biomass_data.loc[biomass_data['code'] == self.requested_site]
-
-        yaxis = biomass_data['biomass_mean'].to_list()
-        xaxis = list(range(1,len(yaxis)+1))
-
-        # print(site_biomass.iloc[0].get("biomass_mean"))
-        # print(int(site_biomass.iloc[0].get("Rank")))
-        # print(biomass_data[biomass_data['code']=='BIG'].index.values)
-
-        # print(biomass_data.loc[[42]])
-        # print(xaxis)
-        
-
-        ## create a figure and save the plot jpg image
-        fig = plt.figure(figsize=(6,6))
-        # plt.scatter(xaxis, yaxis, facecolors='none', edgecolors='b')
-        # plt.savefig("FetchReport\\Graph.png")
-
-        # graph = fig.add_subplot(111)
-        # graph.plot(xaxis, yaxis, color="black")
-
-        # # Add markers and corresponding text
-        # graph.scatter(int(site_biomass.iloc[0].get("Rank")), site_biomass.iloc[0].get("biomass_mean"), facecolors='none', edgecolors='g')
-        # graph.text(int(site_biomass.iloc[0].get("Rank"))+0.25, site_biomass.iloc[0].get("biomass_mean"), self.requested_site)
-
-        # fig.savefig("FetchReport\\Graph.png")
-        return site_biomass
-
-    def fetch_yield(self, site):
-        
-        api_key = os.environ["x-api-key"]
-        api_header = {'x-api-key' : api_key}
-        biomass_url= "https://api.precisionsustainableag.org/onfarm/yield"
-
-        data = requests.get(
-        biomass_url, params={'code':site}, headers=api_header)
-
-        yield_data = pd.DataFrame(data.json())
-        # print(yield_data)
-        return yield_data
-
-
     def fetch_report(self):
         report_data = pd.DataFrame(pd.read_sql(
-            "SELECT a.code, a.affiliation, a.county, a.longitude, a.latitude, a.address, b.cc_planting_date, b.cc_termination_date, b.cash_crop_planting_date, b.cash_crop_harvest_date FROM site_information as a INNER JOIN farm_history as b ON a.code=b.code WHERE a.code = '{}'".format(self.route_params_obj.get("site")), self.shadow_engine))
+            "SELECT a.code, a.affiliation, a.county, a.longitude, a.latitude, "+
+            "a.address, b.cc_planting_date, b.cc_termination_date, "+
+            "b.cash_crop_planting_date, b.cash_crop_harvest_date FROM "+
+            "site_information as a INNER JOIN farm_history as b ON a.code=b.code"+
+            " WHERE a.code = '{}'".format(self.route_params_obj.get("site")), self.shadow_engine))
         return report_data
 
-    def  fetch_precipitation(self, start_date, end_date, lat, lon):
-        api_key = os.environ["x-api-key"]
-        api_header = {'x-api-key' : api_key}
-        precipitation_url= "https://api.precisionsustainableag.org/weather/daily"
-
-        data = requests.get(
-        precipitation_url, params=
-        {'lat':lat, 'lon':lon, 'start':start_date, 'end':end_date}, headers=api_header)
-
-        precipitation_data = pd.DataFrame(data.json())
-        precipitation_data['date'] =  pd.to_datetime(precipitation_data['date']).dt.date
-
-        print(type(precipitation_data.iloc[0].get("date")))
-        return precipitation_data
-
     def generate_report(self):
+        # os.remove("FetchReport\\Graph.png")
+        # os.remove("FetchReport\\vwc_tdrA_b.png")
         report_data = self.fetch_report()
 
         planting_cash = report_data.iloc[0].get("cash_crop_planting_date")
@@ -158,18 +88,32 @@ class FetchReport:
         lat = report_data.iloc[0].get("latitude")
         lon = report_data.iloc[0].get("longitude")
 
-        site_biomass = self.fetch_biomass(report_data.iloc[0].get("affiliation"))
-        site_yield = self.fetch_yield(self.requested_site)
-        precipitation = self.fetch_precipitation(min_date, max_date, lat, lon)
+        site_biomass = biomass.fetch_biomass(self.region[self.aff_2_region[report_data.iloc[0].get("affiliation")]], self.requested_site)
+        site_yield = crop_yield.fetch_yield(self.requested_site)
+        site_precipitation = precipitation.fetch_precipitation(min_date, max_date, lat, lon)
+        vwc = moisture.fetch_vwc(planting_cash, harvest_cash, self.requested_site)
+        vwc_dict = {}
+        if vwc.size != 0:
+            vwc['date'] = pd.to_datetime(vwc['timestamp'])
+            newdf = (vwc.groupby(['treatment', pd.Grouper(key='date', freq='W')]).agg({'vwc':'mean'}))
+            newdf = newdf.reset_index()
+            newdf['date'] = pd.to_datetime(newdf['date']).dt.date
+            print(newdf)
 
-        precipitation_cash_df = precipitation.loc[(precipitation['date'] >= planting_cash) & (precipitation['date'] <= harvest_cash)]
-        precipitation_cover_df = precipitation.loc[(precipitation['date'] >= planting_cover) & (precipitation['date'] <= termination_cover)]
+            for i in range(len(newdf)):
+                d = str(newdf.iloc[i].get('date'))
+                print(d)
+                if d not in vwc_dict.keys():
+                    vwc_dict[d] = ["", ""]
+                if str(newdf.iloc[i].get('treatment')) == "b":
+                    vwc_dict[d][0] = str(round(newdf.iloc[i].get('vwc'), 3))
+                elif str(newdf.iloc[i].get('treatment')) == "c":
+                    vwc_dict[d][1] = str(round(newdf.iloc[i].get('vwc'), 3))
+
+        precipitation_cash_df = site_precipitation.loc[(site_precipitation['date'] >= planting_cash) & (site_precipitation['date'] <= harvest_cash)]
+        precipitation_cover_df = site_precipitation.loc[(site_precipitation['date'] >= planting_cover) & (site_precipitation['date'] <= termination_cover)]
         precipitation_cash = precipitation_cash_df['precipitation'].sum()
         precipitation_cover = precipitation_cover_df['precipitation'].sum()
-        # print(precipitation_cash)
-
-        # if harvest_cash:
-        #     precipitation_cash = sum(x for x in precipitation_cash.iloc[:, "precipitation"].values if harvest_cash and precipitation_cash.iloc[:, "date"]>=planting_cash and precipitation_cash.iloc[:, "precipitation"]<=harvest_cash)
 
         if report_data.empty:
             return func.HttpResponse(json.dumps({"status": "error", "details": "no site code in crown db"}), headers=global_vars.HEADER, status_code=400)
@@ -232,9 +176,9 @@ class FetchReport:
             doc.add_paragraph('Total GDD: ', style='List Bullet')
             preci_para = doc.add_paragraph('Total precipitation: ', style='List Bullet')
             preci_para.add_run("\nTotal precipitation for Cash crop from "+
-            str(planting_cash)+" to "+str(harvest_cash)+" was "+str(precipitation_cash)+"mm")
+            str(planting_cash)+" to "+str(harvest_cash)+" was "+str(round(precipitation_cash, 3))+" mm")
             preci_para.add_run("\nTotal precipitation for Cover crop from "+
-            str(planting_cover)+" to "+str(termination_cover)+" was "+str(precipitation_cover)+"mm")
+            str(planting_cover)+" to "+str(termination_cover)+" was "+str(round(precipitation_cover, 3))+" mm")
             #Cover Crop
             doc.add_heading('Cover Crop:', 3)
             # coverCropPara = doc.add_paragraph()
@@ -244,9 +188,13 @@ class FetchReport:
             ).add_run(str(report_data.iloc[0].get("cc_termination_date")))
             doc.add_paragraph('Biomass (kg/ha): ', style='List Bullet'
             ).add_run(str(site_biomass.iloc[0].get("biomass_mean")))
-            doc.add_paragraph('Biomass in comparison to others in the region:'+
+            biomass_comp_para = doc.add_paragraph('Biomass in comparison to others in the region:'+
             ' \n', style='List Bullet')
-            doc.add_picture("FetchReport\\Graph.png")
+            if os.path.exists("FetchReport\\Graph.png"):
+                doc.add_picture("FetchReport\\Graph.png")
+            else:
+                biomass_comp_para.add_run("Comparison not available")
+
             yield_MgHa = "Not available"
             if len(site_yield)>0:
                 yield_MgHa = str(site_yield.iloc[0].get("adjusted.grain.yield.Mg_ha"))
@@ -256,7 +204,21 @@ class FetchReport:
             #Water and Moisture
             doc.add_heading('Water and Moisture: ', 3)
             doc.add_paragraph('Moisture data: ', style='List Bullet')
-            doc.add_paragraph('Cover crop vs bare: ', style='List Number 2')
+            doc.add_paragraph('Cover crop vs bare: ', style='List Number 2').add_run("Refer the table below")
+            table = doc.add_table(rows=1, cols=3)
+            row = table.rows[0].cells
+            row[0].text = 'Week'
+            row[1].text = 'Treatment B'
+            row[2].text = 'Treatment C'
+            # doc.add_picture("FetchReport\\vwc_tdrA_b.png")
+            for key, value in vwc_dict.items():
+            
+                # Adding a row and then adding data in it.
+                row = table.add_row().cells
+                # Converting id to string as table can only take string input
+                row[0].text = key
+                row[1].text = value[0]
+                row[2].text = value[1]
 
 
             #Decision Support Tools
@@ -269,7 +231,10 @@ class FetchReport:
             'and termination of a cover crop. ')
             
             # now save the document to a location
-            doc.save('SummaryReport.docx')
+            file_name = 'SummaryReport'+self.requested_site+'.docx'
+            doc.save(file_name)
+            if os.path.exists("FetchReport\\Graph.png"):
+                os.remove("FetchReport\\Graph.png")
             return_obj = {
                 "status": "success",
                 "details": "successfully fetched report data for {}".format(self.route_params_obj.get("site")),
