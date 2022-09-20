@@ -1,19 +1,17 @@
 import json
 import os
 import logging
-from turtle import color
-import requests
 import os
 import traceback
 import pandas as pd
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches
 import azure.functions as func
-from datetime import datetime, timedelta, timezone
-import matplotlib.pyplot as plt 
+from datetime import datetime, timedelta
+# import matplotlib.pyplot as plt 
 
 from SharedFunctions import db_connectors, global_vars, initializer
-from FetchReport import biomass, moisture, precipitation, crop_yield
+from FetchReport.utils import biomass, moisture, precipitation, crop_yield, hyperlink, gdd
 
 class FetchReport:
     def __init__(self, req):
@@ -33,87 +31,65 @@ class FetchReport:
             self.shadow_con, self.shadow_cur, self.shadow_engine = db_connectors.connect_to_crown(
                 self.environment)
 
-        self.region = {
-            "Northeast":["PA", "VT", "NH"],
-            "Southeast":["AL", "FL", "GA", "NC"],
-            "Mid-Atlantic":["DE", "MD", "VA", "VAWest"],
-            "Midwest":["IN", "KS", "NE", "Indigo", "AR"],
-        }
-        self.aff_2_region = {
-            "PA":"Northeast",
-            "VT":"Northeast",
-            "NH":"Northeast",
-            "AL":"Southeast",
-            "FL":"Southeast",
-            "GA":"Southeast",
-            "NC":"Southeast",
-            "DE":"Mid-Atlantic",
-            "MD":"Mid-Atlantic",
-            "VA":"Mid-Atlantic",
-            "VAWest":"Mid-Atlantic",
-            "IN":"Midwest",
-            "KS":"Midwest",
-            "NE":"Midwest",
-            "Indigo":"Midwest",
-            "AR":"Midwest",
-        }
-
         self.requested_site = self.route_params_obj.get("site")
 
-    def fetch_report(self):
+    def fetch_reportdata(self):
         report_data = pd.DataFrame(pd.read_sql(
             "SELECT a.code, a.affiliation, a.county, a.longitude, a.latitude, "+
             "a.address, b.cc_planting_date, b.cc_termination_date, "+
             "b.cash_crop_planting_date, b.cash_crop_harvest_date FROM "+
             "site_information as a INNER JOIN farm_history as b ON a.code=b.code"+
-            " WHERE a.code = '{}'".format(self.route_params_obj.get("site")), self.shadow_engine))
+            " WHERE a.code = '{}'"\
+                .format(self.route_params_obj.get("site")), self.shadow_engine))
         return report_data
 
     def generate_report(self):
-        # os.remove("FetchReport\\Graph.png")
-        # os.remove("FetchReport\\vwc_tdrA_b.png")
-        report_data = self.fetch_report()
+        report_data = self.fetch_reportdata()
 
-        planting_cash = report_data.iloc[0].get("cash_crop_planting_date")
-        harvest_cash = report_data.iloc[0].get("cash_crop_harvest_date")
-        if not harvest_cash: harvest_cash = planting_cash + timedelta(days=60)
+        cash_planting = report_data.iloc[0].get("cash_crop_planting_date") \
+            if report_data.iloc[0].get("cash_crop_planting_date") != None else None
+        cash_harvest = report_data.iloc[0].get("cash_crop_harvest_date") \
+            if report_data.iloc[0].get("cash_crop_harvest_date") != None else None
+        cover_planting = report_data.iloc[0].get("cc_planting_date") \
+            if report_data.iloc[0].get("cc_planting_date") != None else None
+        cover_termination = report_data.iloc[0].get("cc_termination_date") \
+            if report_data.iloc[0].get("cc_termination_date") != None else None
 
-        planting_cover = report_data.iloc[0].get("cc_planting_date")
-        termination_cover = report_data.iloc[0].get("cc_termination_date")
-        if not termination_cover: termination_cover =  planting_cover + timedelta(days=60)
+        lat = round(report_data.iloc[0].get("latitude"), 4)
+        lon = round(report_data.iloc[0].get("longitude"), 4)
 
-        dates = [planting_cash, harvest_cash,planting_cover, termination_cover]
-        min_date = min(d for d in dates if d is not None)
-        max_date = max(d for d in dates if d is not None)
-        lat = report_data.iloc[0].get("latitude")
-        lon = report_data.iloc[0].get("longitude")
+        site_biomass = biomass.fetch_biomass(report_data.iloc[0].get("affiliation"), self.requested_site)
+        bare_yield, cover_yield = crop_yield.fetch_yield(self.requested_site)
+        cash_precipitation = precipitation.fetch_precipitation(cash_planting, cash_harvest, lat, lon) \
+            if (cash_planting!=None and cash_harvest!=None) else None
+        cover_precipitation = precipitation.fetch_precipitation(cover_planting, cover_termination, lat, lon) \
+            if (cover_planting!=None and cover_termination!=None) else None
 
-        site_biomass = biomass.fetch_biomass(self.region[self.aff_2_region[report_data.iloc[0].get("affiliation")]], self.requested_site)
-        site_yield = crop_yield.fetch_yield(self.requested_site)
-        site_precipitation = precipitation.fetch_precipitation(min_date, max_date, lat, lon)
-        vwc = moisture.fetch_vwc(planting_cash, harvest_cash, self.requested_site)
+        cash_gdd = gdd.fetch_gdd(cash_planting, cash_harvest, lat, lon, 10) \
+            if (cash_planting!=None and cash_harvest!=None) else None 
+        cover_gdd = gdd.fetch_gdd(cover_planting, cover_termination, lat, lon, 4) \
+            if (cover_planting!=None and cover_termination!=None) else None
+
+        vwc = moisture.fetch_vwc(cover_planting, cover_termination, self.requested_site)\
+            if (cover_planting!=None and cover_termination!=None) else None
         vwc_dict = {}
         if vwc.size != 0:
             vwc['date'] = pd.to_datetime(vwc['timestamp'])
             newdf = (vwc.groupby(['treatment', pd.Grouper(key='date', freq='W')]).agg({'vwc':'mean'}))
             newdf = newdf.reset_index()
             newdf['date'] = pd.to_datetime(newdf['date']).dt.date
+            newdf['date'] = pd.to_datetime(newdf['date']).dt.strftime('%m/%d/%Y')
             print(newdf)
 
             for i in range(len(newdf)):
                 d = str(newdf.iloc[i].get('date'))
-                print(d)
+                # print(d)
                 if d not in vwc_dict.keys():
                     vwc_dict[d] = ["", ""]
                 if str(newdf.iloc[i].get('treatment')) == "b":
                     vwc_dict[d][0] = str(round(newdf.iloc[i].get('vwc'), 3))
                 elif str(newdf.iloc[i].get('treatment')) == "c":
                     vwc_dict[d][1] = str(round(newdf.iloc[i].get('vwc'), 3))
-
-        precipitation_cash_df = site_precipitation.loc[(site_precipitation['date'] >= planting_cash) & (site_precipitation['date'] <= harvest_cash)]
-        precipitation_cover_df = site_precipitation.loc[(site_precipitation['date'] >= planting_cover) & (site_precipitation['date'] <= termination_cover)]
-        precipitation_cash = precipitation_cash_df['precipitation'].sum()
-        precipitation_cover = precipitation_cover_df['precipitation'].sum()
 
         if report_data.empty:
             return func.HttpResponse(json.dumps({"status": "error", "details": "no site code in crown db"}), headers=global_vars.HEADER, status_code=400)
@@ -158,61 +134,76 @@ class FetchReport:
             gpsPara.add_run('\t')
             gpsPara.add_run('Longitude: ')
             gpsPara.add_run(str(lon))
-            gpsPara.add_run('\n (Google maps link)')
+            gpsPara.add_run('\n')
+
+            maps_link = "https://www.google.com/maps/search/{lat},{lon}"\
+                .format(lat=lat, lon=lon)
+            hyperlink.add_hyperlink(gpsPara, maps_link, maps_link)
 
             #Dates this report summarizes
             doc.add_heading('Dates this report summarizes:', 3)
             currentDate = datetime.now()
-            print(currentDate)
-            date = doc.add_paragraph(str(currentDate))
+            date = doc.add_paragraph(currentDate.strftime("%m/%d/%Y"))
 
             #Summary of Activities and Management
             doc.add_heading('Summary of Activities and Management:', 3)
             # activitesPara = doc.add_paragraph()
-            doc.add_paragraph('Date of planting cash crop: ', style='List Bullet'
-            ).add_run(str(report_data.iloc[0].get("cash_crop_planting_date")))
-            doc.add_paragraph('Date of harvest cash crop: ', style='List Bullet'
-            ).add_run(str(report_data.iloc[0].get("cash_crop_harvest_date")))
-            doc.add_paragraph('Total GDD: ', style='List Bullet')
+
+            # Cash crop dates
+            doc.add_paragraph('Date of planting Cash crop: ', style='List Bullet'
+            ).add_run(cash_planting.strftime("%m/%d/%Y") if cash_planting else "Not yet entered")
+            doc.add_paragraph('Date of harvest Cash crop: ', style='List Bullet'
+            ).add_run(cash_harvest.strftime("%m/%d/%Y") if cash_harvest else "Not yet entered")
+
+            #Cover crop dates
+            doc.add_paragraph('Date of planting Cover crop: ', style='List Bullet'
+            ).add_run(cover_planting.strftime("%m/%d/%Y") if cover_planting else "Not yet entered")
+            doc.add_paragraph('Date of termination Cover crop: ', style='List Bullet'
+            ).add_run(cover_termination.strftime("%m/%d/%Y") if cover_termination else "Not yet entered")
+
+            #GDD
+            gdd_para = doc.add_paragraph('Total GDD: ', style='List Bullet')
+            gdd_para.add_run("\nGDD for Cover crop is ")
+            gdd_para.add_run(str(round(cover_gdd[0]['sum(gdd)'], 1)) if cover_gdd else "________")
+            gdd_para.add_run("\nGDD for Cash crop is ")
+            gdd_para.add_run(str(round(cash_gdd[0]['sum(gdd)'], 1)) if cash_gdd else "________")
+
+            #Precipitation
             preci_para = doc.add_paragraph('Total precipitation: ', style='List Bullet')
-            preci_para.add_run("\nTotal precipitation for Cash crop from "+
-            str(planting_cash)+" to "+str(harvest_cash)+" was "+str(round(precipitation_cash, 3))+" mm")
-            preci_para.add_run("\nTotal precipitation for Cover crop from "+
-            str(planting_cover)+" to "+str(termination_cover)+" was "+str(round(precipitation_cover, 3))+" mm")
-            #Cover Crop
-            doc.add_heading('Cover Crop:', 3)
-            # coverCropPara = doc.add_paragraph()
-            doc.add_paragraph('Date of planting- Cover: ', style='List Bullet'
-            ).add_run(str(report_data.iloc[0].get("cc_planting_date")))
-            doc.add_paragraph('Date of termination- Cover: ', style='List Bullet'
-            ).add_run(str(report_data.iloc[0].get("cc_termination_date")))
-            doc.add_paragraph('Biomass (kg/ha): ', style='List Bullet'
-            ).add_run(str(site_biomass.iloc[0].get("biomass_mean")))
-            biomass_comp_para = doc.add_paragraph('Biomass in comparison to others in the region:'+
+            preci_para.add_run("\nPrecipitation for Cover crop is ")
+            preci_para.add_run(str(round(cover_precipitation[0]['sum(precipitation)'], 1))+" mm" if cover_precipitation else "________")
+            preci_para.add_run("\nPrecipitation for Cash crop is ")
+            preci_para.add_run(str(round(cash_precipitation[0]['sum(precipitation)'], 1))+" mm" if cash_precipitation else "________")
+
+            #Biomass and comparison
+            site_biomass = str(round(site_biomass, 1)) if site_biomass else "Unavailable"
+            doc.add_paragraph('Dry matter (lbs/acre):', style='List Bullet'
+            ).add_run(site_biomass)
+            biomass_comp_para = doc.add_paragraph('Dry matter in comparison to others in the region:'+
             ' \n', style='List Bullet')
             if os.path.exists("FetchReport\\Graph.png"):
                 doc.add_picture("FetchReport\\Graph.png")
             else:
                 biomass_comp_para.add_run("Comparison not available")
 
-            yield_MgHa = "Not available"
-            if len(site_yield)>0:
-                yield_MgHa = str(site_yield.iloc[0].get("adjusted.grain.yield.Mg_ha"))
-            doc.add_paragraph('Yield in the bare and cover (Mg/ha): ', style='List Bullet'
-            ).add_run(yield_MgHa)
+            #Yield both bare ground and cover crop
+            yield_para = doc.add_paragraph('Yield: ', style='List Bullet')
+            yield_para.add_run("\nBare Ground :")
+            yield_para.add_run(str(bare_yield)+" Mg/ha" if bare_yield else "Not available")
+            yield_para.add_run("\nCover :")
+            yield_para.add_run(str(bare_yield)+" Mg/ha" if cover_yield else "Not available")
 
             #Water and Moisture
             doc.add_heading('Water and Moisture: ', 3)
             doc.add_paragraph('Moisture data: ', style='List Bullet')
             doc.add_paragraph('Cover crop vs bare: ', style='List Number 2').add_run("Refer the table below")
-            table = doc.add_table(rows=1, cols=3)
+            table = doc.add_table(rows=1, cols=3, style="Table Grid")
             row = table.rows[0].cells
             row[0].text = 'Week'
-            row[1].text = 'Treatment B'
-            row[2].text = 'Treatment C'
-            # doc.add_picture("FetchReport\\vwc_tdrA_b.png")
+            row[1].text = 'Bare Ground'
+            row[2].text = 'Cover Crop'
+
             for key, value in vwc_dict.items():
-            
                 # Adding a row and then adding data in it.
                 row = table.add_row().cells
                 # Converting id to string as table can only take string input
@@ -220,6 +211,8 @@ class FetchReport:
                 row[1].text = value[0]
                 row[2].text = value[1]
 
+            if os.path.exists("FetchReport\\MoistureGraph.png"):
+                doc.add_picture("FetchReport\\MoistureGraph.png")
 
             #Decision Support Tools
             doc.add_heading('Decision Support Tools:', 3)
@@ -235,6 +228,8 @@ class FetchReport:
             doc.save(file_name)
             if os.path.exists("FetchReport\\Graph.png"):
                 os.remove("FetchReport\\Graph.png")
+            if os.path.exists("FetchReport\\MoistureGraph.png"):
+                os.remove("FetchReport\\MoistureGraph.png")
             return_obj = {
                 "status": "success",
                 "details": "successfully fetched report data for {}".format(self.route_params_obj.get("site")),

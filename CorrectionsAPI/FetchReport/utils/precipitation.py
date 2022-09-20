@@ -9,10 +9,5 @@ def  fetch_precipitation(start_date, end_date, lat, lon):
 
     data = requests.get(
     precipitation_url, params=
-    {'lat':lat, 'lon':lon, 'start':start_date, 'end':end_date}, headers=api_header)
-
-    precipitation_data = pd.DataFrame(data.json())
-    precipitation_data['date'] =  pd.to_datetime(precipitation_data['date']).dt.date
-
-    print(type(precipitation_data.iloc[0].get("date")))
-    return precipitation_data
+    {'lat':lat, 'lon':lon, 'start':start_date, 'end':end_date, 'stats':'sum(precipitation)'}, headers=api_header)
+    return data.json()
