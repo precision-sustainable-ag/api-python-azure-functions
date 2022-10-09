@@ -65,12 +65,14 @@ def fetch_biomass(affiliation, requested_site):
         plt.scatter(xaxis, yaxis, color='black', alpha=0.5)
         plt.scatter(int(site_biomass.iloc[0].get("Rank")), site_biomass.iloc[0].get("ash_corrected_cc_dry_biomass_lb_ac"), color='red', s=100)
         plt.text(int(site_biomass.iloc[0].get("Rank")), site_biomass.iloc[0].get("ash_corrected_cc_dry_biomass_lb_ac"), requested_site)
-        plt.title("Biomass data for {reg} region in year {year}".format(reg=aff_2_region[affiliation], year=str(site_year)))
+        # plt.title("Biomass data for {reg} region in year {year}".format(reg=aff_2_region[affiliation], year=str(site_year)))
+        plt.title("This is your farm's dry matter in comparison to all farms that use \n cover crops in our network in the {reg} region".format(reg=aff_2_region[affiliation]))
         plt.xlabel("Rank")
         plt.ylabel("Biomass produce in lbs/acre")
         plt.savefig("FetchReport\\Graph.png")
         plt.clf()
         plt.close()
-        return site_biomass.iloc[0].get("ash_corrected_cc_dry_biomass_lb_ac")
+        return site_biomass.iloc[0].get("ash_corrected_cc_dry_biomass_lb_ac"), \
+            site_biomass.iloc[0].get("cc_species")
 
     return None

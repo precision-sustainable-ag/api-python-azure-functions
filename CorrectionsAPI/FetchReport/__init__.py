@@ -58,7 +58,7 @@ class FetchReport:
         lat = round(report_data.iloc[0].get("latitude"), 4)
         lon = round(report_data.iloc[0].get("longitude"), 4)
 
-        site_biomass = biomass.fetch_biomass(report_data.iloc[0].get("affiliation"), self.requested_site)
+        site_biomass, species = biomass.fetch_biomass(report_data.iloc[0].get("affiliation"), self.requested_site)
         bare_yield, cover_yield = crop_yield.fetch_yield(self.requested_site)
         cash_precipitation = precipitation.fetch_precipitation(cash_planting, cash_harvest, lat, lon) \
             if (cash_planting!=None and cash_harvest!=None) else None
@@ -68,6 +68,11 @@ class FetchReport:
         cash_gdd = gdd.fetch_gdd(cash_planting, cash_harvest, lat, lon, 10) \
             if (cash_planting!=None and cash_harvest!=None) else None 
         cover_gdd = gdd.fetch_gdd(cover_planting, cover_termination, lat, lon, 4) \
+            if (cover_planting!=None and cover_termination!=None) else None
+
+        cash_days = (cash_harvest-cash_planting).days \
+            if (cash_planting!=None and cash_harvest!=None) else None 
+        cover_days = (cover_termination-cover_planting).days \
             if (cover_planting!=None and cover_termination!=None) else None
 
         vwc = moisture.fetch_vwc(cover_planting, cover_termination, self.requested_site)\
@@ -154,12 +159,16 @@ class FetchReport:
             ).add_run(cash_planting.strftime("%m/%d/%Y") if cash_planting else "Not yet entered")
             doc.add_paragraph('Date of harvest Cash crop: ', style='List Bullet'
             ).add_run(cash_harvest.strftime("%m/%d/%Y") if cash_harvest else "Not yet entered")
+            doc.add_paragraph('Cash crop no of days in production: ', style='List Bullet'
+            ).add_run(str(cash_days) if cash_days else "________")
 
             #Cover crop dates
             doc.add_paragraph('Date of planting Cover crop: ', style='List Bullet'
             ).add_run(cover_planting.strftime("%m/%d/%Y") if cover_planting else "Not yet entered")
             doc.add_paragraph('Date of termination Cover crop: ', style='List Bullet'
             ).add_run(cover_termination.strftime("%m/%d/%Y") if cover_termination else "Not yet entered")
+            doc.add_paragraph('Cover crop no of days in production: ', style='List Bullet'
+            ).add_run(str(cover_days) if cover_days else "________")
 
             #GDD
             gdd_para = doc.add_paragraph('Total GDD: ', style='List Bullet')
@@ -176,6 +185,10 @@ class FetchReport:
             preci_para.add_run(str(round(cash_precipitation[0]['sum(precipitation)'], 1))+" mm" if cash_precipitation else "________")
 
             #Biomass and comparison
+            species = species if species else "Unavailable"
+            doc.add_paragraph('Cover crop species: ', style='List Bullet'
+            ).add_run(species)
+            
             site_biomass = str(round(site_biomass, 1)) if site_biomass else "Unavailable"
             doc.add_paragraph('Dry matter (lbs/acre):', style='List Bullet'
             ).add_run(site_biomass)
@@ -193,6 +206,11 @@ class FetchReport:
             yield_para.add_run("\nCover :")
             yield_para.add_run(str(bare_yield)+" Mg/ha" if cover_yield else "Not available")
 
+            #Water and Moisture
+            doc.add_heading('Soil Temperature: ', 3)
+            doc.add_paragraph('Temperature data: ', style='List Bullet')
+            if os.path.exists("FetchReport\\TemperatureGraph.png"):
+                doc.add_picture("FetchReport\\TemperatureGraph.png")            
             #Water and Moisture
             doc.add_heading('Water and Moisture: ', 3)
             doc.add_paragraph('Moisture data: ', style='List Bullet')
@@ -213,6 +231,14 @@ class FetchReport:
 
             if os.path.exists("FetchReport\\MoistureGraph.png"):
                 doc.add_picture("FetchReport\\MoistureGraph.png")
+            if os.path.exists("FetchReport\\MoistureGraphD.png"):
+                doc.add_picture("FetchReport\\MoistureGraphD.png")
+            if os.path.exists("FetchReport\\MoistureGraphC.png"):
+                doc.add_picture("FetchReport\\MoistureGraphC.png")
+            if os.path.exists("FetchReport\\MoistureGraphB.png"):
+                doc.add_picture("FetchReport\\MoistureGraphB.png")
+            if os.path.exists("FetchReport\\MoistureGraphA.png"):
+                doc.add_picture("FetchReport\\MoistureGraphA.png")
 
             #Decision Support Tools
             doc.add_heading('Decision Support Tools:', 3)
