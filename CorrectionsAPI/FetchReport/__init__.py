@@ -12,7 +12,7 @@ import io
 # import matplotlib.pyplot as plt
 
 from SharedFunctions import db_connectors, global_vars, initializer
-from FetchReport.utils import biomass, moisture, precipitation, crop_yield, hyperlink, gdd, raw_nir
+from FetchReport.controller import biomass, moisture, precipitation, crop_yield, hyperlink, gdd, raw_nir
 
 
 class FetchReport:
