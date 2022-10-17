@@ -17,8 +17,8 @@ RUN apt-get install -y postgresql postgresql-contrib
 RUN apt-get install -y gcc
 
 COPY requirements.txt /
+RUN pip cache purge
 RUN pip install -r /requirements.txt
 
 
 COPY . /home/site/wwwroot
-COPY local.settings.json /home/site/wwwroot
