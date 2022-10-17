@@ -17,6 +17,7 @@ RUN apt-get install -y postgresql postgresql-contrib
 RUN apt-get install -y gcc
 
 COPY requirements.txt /
+RUN pip install -upgrade pip
 RUN pip cache purge
 RUN pip install -r /requirements.txt
 
