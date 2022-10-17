@@ -9,7 +9,7 @@
       "methods": [
         "post"
       ],
-      "route": "weeds3d/videos"
+      "route": "crowndb/farm_history/{code}"
     },
     {
       "type": "http",
