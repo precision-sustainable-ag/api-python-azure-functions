@@ -10,7 +10,7 @@ def req(start_date, end_date, site):
         resp = requests.get(
             moisture_url,
             params={
-                'type': 'tdr', 'start': start_date, 'end': end_date, 'code': site},
+                'type': 'tdr', 'start': start_date, 'code': site},
             headers=api_header)
         return resp, True
 

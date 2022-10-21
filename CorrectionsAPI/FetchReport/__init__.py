@@ -6,8 +6,9 @@ import traceback
 import pandas as pd
 import azure.functions as func
 import io
+import asyncio
 from SharedFunctions import db_connectors, global_vars, initializer
-from .controller import create_doc
+from .controller import assemble_doc
 
 
 class FetchReport:
@@ -44,21 +45,22 @@ class FetchReport:
         report_data = self.fetch_reportdata()
 
         if report_data.empty:
-            return func.HttpResponse(json.dumps({"status": "error", "details": "no site code in crown db"}), headers=global_vars.HEADER, status_code=400)
+            return func.HttpResponse(
+                json.dumps({"status": "error", "details": "No site code in crown db"}), 
+                headers=global_vars.HEADER, status_code=400)
         else:
             word_bytes = io.BytesIO()
-            doc = create_doc.create(report_data, self.requested_site)
+            doc = assemble_doc.assemble(report_data, self.requested_site)
 
-            # now save the document to a location/share as API response
+            # Save the document to a location/share as API response
             # file_name = 'SummaryReport'+self.requested_site+'.docx'
             doc.save(word_bytes)
             word_bytes.seek(0)
-            return_obj = {
-                "status": "success",
-                "details": "successfully fetched report data for {}".format(self.route_params_obj.get("site")),
-                "json_response": "response obtained from fetch query {}".format(report_data),
-            }
-            return func.HttpResponse(word_bytes.read(), headers=global_vars.HEADER, status_code=201, mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            return func.HttpResponse(
+                word_bytes.read(), 
+                headers=global_vars.HEADER, 
+                status_code=201, 
+                mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
