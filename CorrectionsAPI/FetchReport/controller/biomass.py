@@ -1,8 +1,9 @@
+from ..services import biomass
+import pandas as pd
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 import matplotlib.ticker as mticker
-import pandas as pd
-from ..services import biomass
+
 
 
 def fetch_biomass(affiliation, requested_site):
@@ -39,7 +40,7 @@ def fetch_biomass(affiliation, requested_site):
 
         site_biomass = biomass_data[biomass_data['code'] == requested_site]
         if len(site_biomass) > 0 and \
-            pd.notna(site_biomass.iloc[0].get('ash_corrected_cc_dry_biomass_kg_ha')):
+                pd.notna(site_biomass.iloc[0].get('ash_corrected_cc_dry_biomass_kg_ha')):
             biomass_data['ash_corrected_cc_dry_biomass_lb_ac'] = (
                 biomass_data['ash_corrected_cc_dry_biomass_kg_ha']*0.892179)
             site_year = site_biomass.iloc[0].get('year')

@@ -4,8 +4,8 @@ import requests
 
 def req(start_date, end_date, site):
     try:
-        api_key = os.environ["X_API_KEY"]
-        api_header = {'X_API_KEY': api_key}
+        api_key = os.environ["x_api_key"]
+        api_header = {'x_api_key': api_key}
         moisture_url = "https://api.precisionsustainableag.org/onfarm/soil_moisture"
         resp = requests.get(
             moisture_url,

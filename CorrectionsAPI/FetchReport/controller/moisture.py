@@ -1,22 +1,22 @@
+from ..services import moisture
 import pandas as pd
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
-from ..services import moisture
 
 
 def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
     try:
         vwc['date'] = pd.to_datetime(vwc['timestamp'])
-        newdf = (vwc.groupby(['treatment', pd.Grouper(
+        new_df = (vwc.groupby(['treatment', pd.Grouper(
             key='date', freq='W')]).agg({'vwc': 'mean'}))
-        newdf = newdf.reset_index()
-        newdf['date'] = pd.to_datetime(newdf['date']).dt.date
-        bare_df = newdf.loc[newdf['treatment'] == 'b']
-        cover_df = newdf.loc[newdf['treatment'] == 'c']
+        new_df = new_df.reset_index()
+        new_df['date'] = pd.to_datetime(new_df['date']).dt.date
+        bare_df = new_df.loc[new_df['treatment'] == 'b']
+        cover_df = new_df.loc[new_df['treatment'] == 'c']
         bare_df.sort_values(by=['date'], inplace=True)
         cover_df.sort_values(by=['date'], inplace=True)
 
-        # newdf['date'] = pd.to_datetime(newdf['date']).dt.strftime('%m/%d/%Y')
+        # new_df['date'] = pd.to_datetime(new_df['date']).dt.strftime('%m/%d/%Y')
         y_bare = bare_df['vwc'].to_list()
         y_cover = cover_df['vwc'].to_list()
         x_bare = bare_df['date'].to_list()
@@ -34,7 +34,7 @@ def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
         plt.xlabel("Week")
         plt.ylabel("Moisture(%)")
         plt.title("Soil Moisture percentage at {depth} depth"
-                .format(depth=depth))
+                  .format(depth=depth))
 
         # Adding legend, which helps us recognize the curve according to it's color
         plt.legend()
@@ -43,6 +43,7 @@ def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
         plt.close()
     except Exception as e:
         print(e)
+
 
 def fetch_vwc(start_date, end_date, site):
     resp, resp_status = moisture.req(start_date, end_date, site)
@@ -67,16 +68,16 @@ def fetch_vwc(start_date, end_date, site):
                        start_date, end_date, "31 inch")
 
             # vwc_d['date'] = pd.to_datetime(vwc_d['timestamp'])
-            newdf = (vwc_d.groupby(['treatment', pd.Grouper(
+            new_df = (vwc_d.groupby(['treatment', pd.Grouper(
                 key='date', freq='W')]).agg({'soil_temp': 'mean'}))
-            newdf = newdf.reset_index()
-            newdf['date'] = pd.to_datetime(newdf['date']).dt.date
-            bare_df = newdf.loc[newdf['treatment'] == 'b']
-            cover_df = newdf.loc[newdf['treatment'] == 'c']
+            new_df = new_df.reset_index()
+            new_df['date'] = pd.to_datetime(new_df['date']).dt.date
+            bare_df = new_df.loc[new_df['treatment'] == 'b']
+            cover_df = new_df.loc[new_df['treatment'] == 'c']
             bare_df.sort_values(by=['date'], inplace=True)
             cover_df.sort_values(by=['date'], inplace=True)
 
-            # newdf['date'] = pd.to_datetime(newdf['date']).dt.strftime('%m/%d/%Y')
+            # new_df['date'] = pd.to_datetime(new_df['date']).dt.strftime('%m/%d/%Y')
             bare_df['soil_temp'] = bare_df['soil_temp'].apply(
                 lambda x: x*1.8 + 32)
             cover_df['soil_temp'] = cover_df['soil_temp'].apply(
@@ -85,7 +86,6 @@ def fetch_vwc(start_date, end_date, site):
             y_cover = cover_df['soil_temp'].to_list()
             x_bare = bare_df['date'].to_list()
             x_cover = cover_df['date'].to_list()
-
 
             # Plotting both the curves simultaneously
             plt.plot(x_bare, y_bare, color='y', label='Bare Ground')

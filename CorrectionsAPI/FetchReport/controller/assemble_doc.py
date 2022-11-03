@@ -22,21 +22,21 @@ def assemble(report_data, requested_site):
     doc = create_doc.doc_header(doc)
 
     # PSA paragraph
-    psaPara = doc.add_paragraph("\nThe Precision Sustainable Agriculture (PSA)" +
-                                "On-Farm network deploys common research protocols that study the " +
-                                "short-term effects of cover crops on farms that currently use cover" +
-                                " crops. By utilizing farms with different management practices, the data" +
-                                " collected can account for a wide range of factors such as termination " +
-                                "timing, specific selections, and climate impacts. The data is used to " +
-                                "build tools to aid in site-specific management decisions.\n")
+    doc.add_paragraph("\nThe Precision Sustainable Agriculture (PSA)" +
+                      "On-Farm network deploys common research protocols that study the " +
+                      "short-term effects of cover crops on farms that currently use cover" +
+                      " crops. By utilizing farms with different management practices, the data" +
+                      " collected can account for a wide range of factors such as termination " +
+                      "timing, specific selections, and climate impacts. The data is used to " +
+                      "build tools to aid in site-specific management decisions.\n")
 
     doc.add_heading('Farm Details', 2)
     doc = create_doc.doc_farmDetails(doc, report_data)
 
     # Dates this report summarizes
     doc.add_heading('Dates this report summarizes:', 4)
-    currentDate = datetime.now()
-    date = doc.add_paragraph(currentDate.strftime("%m/%d/%Y"))
+    current_date = datetime.now()
+    doc.add_paragraph(current_date.strftime("%m/%d/%Y"))
 
     # Summary of Activities and Management
     doc.add_heading('Summary of Activities and Management', 2)
@@ -62,16 +62,16 @@ def assemble(report_data, requested_site):
     # Yield
     doc = create_doc.doc_yield(doc, requested_site)
 
-    #Temperature, Water and Moisture
+    # Temperature, Water and Moisture
     doc = create_doc.doc_vwc(doc, requested_site, cash_planting, cash_harvest)
 
     # Decision Support Tools
     doc.add_heading('Decision Support Tools:', 3)
-    dstPara = doc.add_paragraph()
-    dstPara.add_run('The Decision Support Tools (DSTs) are designed for farmers' +
-                    ' to input their data and receive custom generated information on how to ' +
-                    'address their management strategies. The Cover Crop Nitrogen Calculator ' +
-                    '(CC-NCALC) calculates the amount of nitrogen available after the planting ' +
-                    'and termination of a cover crop. ')
+    dst_para = doc.add_paragraph()
+    dst_para.add_run('The Decision Support Tools (DSTs) are designed for farmers' +
+                     ' to input their data and receive custom generated information on how to ' +
+                     'address their management strategies. The Cover Crop Nitrogen Calculator ' +
+                     '(CC-NCALC) calculates the amount of nitrogen available after the planting ' +
+                     'and termination of a cover crop. ')
 
     return doc
