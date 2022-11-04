@@ -33,7 +33,7 @@ def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
         # Naming the x-axis, y-axis and the whole graph
         plt.xlabel("Week")
         plt.ylabel("Moisture(%)")
-        plt.title("Soil Moisture percentage at {depth} depth"
+        plt.title("Moisture percentage at {depth} depth"
                 .format(depth=depth))
 
         # Adding legend, which helps us recognize the curve according to it's color
@@ -55,16 +55,16 @@ def fetch_vwc(start_date, end_date, site):
                        start_date, end_date)
             vwc_d = vwc_data[vwc_data["center_depth"] == -5]
             plot_graph(vwc_d, "FetchReport\\data\\MoistureGraphD.png",
-                       start_date, end_date, "surface")
+                       start_date, end_date, str(-5))
             vwc_c = vwc_data[vwc_data["center_depth"] == -15]
             plot_graph(vwc_c, "FetchReport\\data\\MoistureGraphC.png",
-                       start_date, end_date, "6 inch")
+                       start_date, end_date, str(-15))
             vwc_b = vwc_data[vwc_data["center_depth"] == -45]
             plot_graph(vwc_b, "FetchReport\\data\\MoistureGraphB.png",
-                       start_date, end_date, "18 inch")
+                       start_date, end_date, str(-45))
             vwc_a = vwc_data[vwc_data["center_depth"] == -80]
             plot_graph(vwc_a, "FetchReport\\data\\MoistureGraphA.png",
-                       start_date, end_date, "31 inch")
+                       start_date, end_date, str(-80))
 
             # vwc_d['date'] = pd.to_datetime(vwc_d['timestamp'])
             newdf = (vwc_d.groupby(['treatment', pd.Grouper(
@@ -95,7 +95,7 @@ def fetch_vwc(start_date, end_date, site):
             # Naming the x-axis, y-axis and the whole graph
             plt.xlabel("Week")
             plt.ylabel("Temperature in deg F")
-            plt.title("Soil temperature at surface"
+            plt.title("Soil temperature at depth {depth}"
                       .format(depth=str(-5)))
 
             # Adding legend, which helps us recognize the curve according to it's color
