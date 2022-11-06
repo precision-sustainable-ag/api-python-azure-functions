@@ -16,7 +16,7 @@ def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
         bare_df.sort_values(by=['date'], inplace=True)
         cover_df.sort_values(by=['date'], inplace=True)
 
-        # new_df['date'] = pd.to_datetime(new_df['date']).dt.strftime('%m/%d/%Y')
+    # new_df['date'] = pd.to_datetime(new_df['date']).dt.strftime('%m/%d/%Y')
         y_bare = bare_df['vwc'].to_list()
         y_cover = cover_df['vwc'].to_list()
         x_bare = bare_df['date'].to_list()
@@ -36,7 +36,7 @@ def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
         plt.title("Soil Moisture percentage at {depth} depth"
                   .format(depth=depth))
 
-        # Adding legend, which helps us recognize the curve according to it's color
+        # Adding legend, which helps us recognize curve according to it's color
         plt.legend()
         plt.savefig(file_name)
         plt.clf()
@@ -77,7 +77,7 @@ def fetch_vwc(start_date, end_date, site):
             bare_df.sort_values(by=['date'], inplace=True)
             cover_df.sort_values(by=['date'], inplace=True)
 
-            # new_df['date'] = pd.to_datetime(new_df['date']).dt.strftime('%m/%d/%Y')
+        # new_df['date']=pd.to_datetime(new_df['date']).dt.strftime('%m/%d/%Y')
             bare_df['soil_temp'] = bare_df['soil_temp'].apply(
                 lambda x: x*1.8 + 32)
             cover_df['soil_temp'] = cover_df['soil_temp'].apply(
@@ -95,10 +95,8 @@ def fetch_vwc(start_date, end_date, site):
             # Naming the x-axis, y-axis and the whole graph
             plt.xlabel("Week")
             plt.ylabel("Temperature in deg F")
-            plt.title("Soil temperature at surface"
-                      .format(depth=str(-5)))
+            plt.title("Soil temperature at surface")
 
-            # Adding legend, which helps us recognize the curve according to it's color
             plt.legend()
             plt.savefig("FetchReport\\data\\TemperatureGraph.png")
             plt.clf()

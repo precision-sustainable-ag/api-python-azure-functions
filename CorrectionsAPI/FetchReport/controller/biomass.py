@@ -1,9 +1,8 @@
+import matplotlib.ticker as mticker
 from ..services import biomass
 import pandas as pd
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
-import matplotlib.ticker as mticker
-
 
 
 def fetch_biomass(affiliation, requested_site):
@@ -52,7 +51,8 @@ def fetch_biomass(affiliation, requested_site):
             site_biomass = (
                 biomass_data.loc[biomass_data['code'] == requested_site])
 
-            yaxis = biomass_data['ash_corrected_cc_dry_biomass_lb_ac'].to_list()
+            yaxis = biomass_data['ash_corrected_cc_dry_biomass_lb_ac'].to_list(
+            )
             xaxis = list(range(1, len(yaxis)+1))
 
             # create a figure and save the plot jpg image

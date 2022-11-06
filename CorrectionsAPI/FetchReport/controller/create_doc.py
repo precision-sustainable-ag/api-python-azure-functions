@@ -1,4 +1,5 @@
-from ..controller import raw_nir, crop_yield, moisture, gdd, precipitation, hyperlink, biomass
+from ..controller import raw_nir, crop_yield, moisture
+from ..controller import gdd, precipitation, hyperlink, biomass
 import os
 # from docx import Document
 from docx.shared import Inches
@@ -64,7 +65,7 @@ def doc_farmDetails(doc, report_data):
 def doc_cashcrop(doc, cash_planting, cash_harvest):
     try:
         cash_days = (cash_harvest-cash_planting).days \
-            if (cash_planting != None and cash_harvest != None) else None
+            if (cash_planting is not None and cash_harvest is not None) else None
         doc.add_heading('Cash crop days:', 4)
         # Cash crop dates
         doc.add_paragraph('Date of planting Cash crop: ', style='List Bullet'
@@ -83,7 +84,7 @@ def doc_cashcrop(doc, cash_planting, cash_harvest):
 def doc_covercrop(doc, cover_planting, cover_termination):
     try:
         cover_days = (cover_termination-cover_planting).days \
-            if (cover_planting != None and cover_termination != None) else None
+            if (cover_planting is not None and cover_termination is not None) else None
         doc.add_heading('Cover crop days:', 4)
         # Cover crop dates
         doc.add_paragraph('Date of planting Cover crop: ', style='List Bullet'
@@ -101,9 +102,9 @@ def doc_covercrop(doc, cover_planting, cover_termination):
 def doc_gdd(doc, cash_planting, cash_harvest, cover_planting, cover_termination, lat, lon):
     try:
         cash_gdd = gdd.fetch_gdd(cash_planting, cash_harvest, lat, lon, 10) \
-            if (cash_planting != None and cash_harvest != None) else None
+            if (cash_planting is not None and cash_harvest is not None) else None
         cover_gdd = gdd.fetch_gdd(cover_planting, cover_termination, lat, lon, 4) \
-            if (cover_planting != None and cover_termination != None) else None
+            if (cover_planting is not None and cover_termination is not None) else None
 
         doc.add_heading('GDD:', 4)
         gdd_para = doc.add_paragraph(
@@ -124,9 +125,9 @@ def doc_gdd(doc, cash_planting, cash_harvest, cover_planting, cover_termination,
 def doc_precipitation(doc, cash_planting, cash_harvest, cover_planting, cover_termination, lat, lon):
     try:
         cash_precipitation = precipitation.fetch_precipitation(cash_planting, cash_harvest, lat, lon) \
-            if (cash_planting != None and cash_harvest != None) else None
+            if (cash_planting is not None and cash_harvest is not None) else None
         cover_precipitation = precipitation.fetch_precipitation(cover_planting, cover_termination, lat, lon) \
-            if (cover_planting != None and cover_termination != None) else None
+            if (cover_planting is not None and cover_termination is not None) else None
 
         doc.add_heading('Precipitation:', 4)
         # Precipitation
@@ -210,8 +211,8 @@ def doc_yield(doc, requested_site):
 def doc_vwc(doc, requested_site, cash_planting, cash_harvest):
     try:
         vwc = moisture.fetch_vwc(cash_planting, cash_harvest, requested_site)\
-            if (cash_planting != None) else None
-        # if (cash_planting != None and cash_harvest != None) else None
+            if (cash_planting is not None) else None
+        # if (cash_planting is not None and cash_harvest is not None) else None
         vwc_dict = {}
         if vwc.size != 0:
             vwc['date'] = pd.to_datetime(vwc['timestamp'])
