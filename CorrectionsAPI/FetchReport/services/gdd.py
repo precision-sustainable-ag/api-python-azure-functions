@@ -4,8 +4,8 @@ import requests
 
 def req(lat, lon, start_date, end_date, gddbase):
     try:
-        api_key = os.environ["x_api_key"]
-        api_header = {'x_api_key': api_key}
+        api_key = os.environ["X_API_KEY"]
+        api_header = {'x-api-key': api_key}
         gdd_url = "https://api.precisionsustainableag.org/weather/daily"
         resp = requests.get(gdd_url, \
             params={
