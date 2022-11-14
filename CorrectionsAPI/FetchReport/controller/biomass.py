@@ -1,3 +1,4 @@
+import io
 import matplotlib.ticker as mticker
 from ..services import biomass
 import pandas as pd
@@ -56,6 +57,7 @@ def fetch_biomass(affiliation, requested_site):
             xaxis = list(range(1, len(yaxis)+1))
 
             # create a figure and save the plot jpg image
+            figure = io.BytesIO()
             plt.figure()
             plt.scatter(xaxis, yaxis, color='black', alpha=0.5)
             plt.scatter(int(site_biomass.iloc[0].get("Rank")), site_biomass.iloc[0].get(
@@ -68,10 +70,11 @@ def fetch_biomass(affiliation, requested_site):
             plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(2))
             plt.xlabel("Rank")
             plt.ylabel("Biomass produce in lbs/acre")
-            plt.savefig("FetchReport\\data\\Graph.png")
+            plt.savefig(figure)
+            # plt.savefig("FetchReport/Graph.png")
             plt.clf()
             plt.close()
             return site_biomass.iloc[0].get("ash_corrected_cc_dry_biomass_lb_ac"), \
-                site_biomass.iloc[0].get("cc_species")
+                site_biomass.iloc[0].get("cc_species"), figure
 
         return None
