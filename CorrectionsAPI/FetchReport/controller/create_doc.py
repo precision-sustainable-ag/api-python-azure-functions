@@ -199,10 +199,10 @@ def doc_yield(doc, requested_site):
         doc.add_heading('Yield:', 4)
         yield_para = doc.add_paragraph('Bare Ground: ', style='List Bullet')
         yield_para.add_run(
-            str(bare_yield)+" Mg/ha" if bare_yield else "Not available")
+            str(round(bare_yield, 5))+" bushels/ac" if bare_yield else "Not available")
         yield_para = doc.add_paragraph('Cover: ', style='List Bullet')
         yield_para.add_run(
-            str(cover_yield)+" Mg/ha" if cover_yield else "Not available")
+            str(round(cover_yield, 5))+" bushels/ac" if cover_yield else "Not available")
 
     except Exception as e:
         print(e)
@@ -236,10 +236,7 @@ def doc_vwc(doc, requested_site, cash_planting, cash_harvest):
 
         doc.add_heading('Soil Temperature: ', 4)
         doc.add_paragraph('Temperature data: ', style='List Bullet')
-        # if os.path.exists("FetchReport/data/TemperatureGraph.png"):
-        #     doc.add_picture("FetchReport/data/TemperatureGraph.png")
-        # if os.path.exists("FetchReport/data/TemperatureGraph.png"):
-        #     os.remove("FetchReport/data/TemperatureGraph.png")
+
         try:
             fig_temp.seek(0)
             doc.add_picture(fig_temp)
@@ -296,33 +293,6 @@ def doc_vwc(doc, requested_site, cash_planting, cash_harvest):
         except Exception as no_graph:
             doc.add_paragraph(
                 'Moisture A Graph not available\n', style='List Bullet')
-
-        # if os.path.exists("FetchReport/data/MoistureGraph.png"):
-        #     doc.add_picture("FetchReport/data/MoistureGraph.png")
-        # if os.path.exists("FetchReport/data/MoistureGraphD.png"):
-        #     doc.add_picture("FetchReport/data/MoistureGraphD.png")
-        # if os.path.exists("FetchReport/data/MoistureGraphC.png"):
-        #     doc.add_picture("FetchReport/data/MoistureGraphC.png")
-        # if os.path.exists("FetchReport/data/MoistureGraphB.png"):
-        #     doc.add_picture("FetchReport/data/MoistureGraphB.png")
-        # if os.path.exists("FetchReport/data/MoistureGraphA.png"):
-        #     doc.add_picture("FetchReport/data/MoistureGraphA.png")
-
-        # if os.path.exists("FetchReport/data/MoistureGraph.png"):
-        #     os.remove("FetchReport/data/MoistureGraph.png")
-        # if os.path.exists("FetchReport/data/MoistureGraphD.png"):
-        #     os.remove("FetchReport/data/MoistureGraphD.png")
-        # if os.path.exists("FetchReport/data/MoistureGraphC.png"):
-        #     os.remove("FetchReport/data/MoistureGraphC.png")
-        # if os.path.exists("FetchReport/data/MoistureGraphB.png"):
-        #     os.remove("FetchReport/data/MoistureGraphB.png")
-        # if os.path.exists("FetchReport/data/MoistureGraphA.png"):
-        #     os.remove("FetchReport/data/MoistureGraphA.png")
-
-        # if os.path.exists("FetchReport/data/Graph.png"):
-        #     os.remove("FetchReport/Graph.png")
-        # if os.path.exists("FetchReport/data/MoistureGraph.png"):
-        #     os.remove("FetchReport/data/MoistureGraph.png")
 
     except Exception as e:
         print(e)
