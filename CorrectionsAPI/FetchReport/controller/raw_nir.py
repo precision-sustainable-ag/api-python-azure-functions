@@ -1,9 +1,10 @@
 import pandas as pd
+import asyncio
 from ..services import raw_nir
 
 
-def fetch_nir(affiliation, site):
-    resp, resp_status = raw_nir.req(affiliation, site)
+async def fetch_nir(affiliation, site):
+    resp, resp_status = await raw_nir.req(affiliation, site)
     if (resp_status):
         nir = pd.DataFrame(resp.json())
         nitrogen = None

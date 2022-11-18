@@ -1,12 +1,11 @@
 import json
 import os
 import logging
-import os
 import traceback
 import pandas as pd
 import azure.functions as func
 import io
-import asyncio
+# import asyncio
 from SharedFunctions import db_connectors, global_vars, initializer
 from .controller import assemble_doc
 
@@ -18,7 +17,7 @@ class FetchReport:
 
         self.route_params_obj = initial_state["route_params_obj"]
         self.token = initial_state["token"]
-        self.token_missing = initial_state["token"] == None
+        self.token_missing = True if initial_state["token"] is None else False
         self.authenticated = initial_state["authenticated"]
         self.auth_response = initial_state["auth_response"]
         self.invalid_params = initial_state["route_params_obj"] is None
@@ -26,27 +25,29 @@ class FetchReport:
         # connect to dbs
         if self.authenticated:
             self.environment = os.environ.get('AZURE_FUNCTIONS_ENVIRONMENT')
-            self.shadow_con, self.shadow_cur, self.shadow_engine = db_connectors.connect_to_crown(
-                self.environment)
+            self.shadow_con, self.shadow_cur, self.shadow_engine = \
+                db_connectors.connect_to_crown(self.environment)
 
         self.requested_site = self.route_params_obj.get("site")
 
-    def fetch_reportdata(self):
+    def fetch_report_data(self):
         report_data = pd.DataFrame(pd.read_sql(
-            "SELECT a.code, a.affiliation, a.county, a.longitude, a.latitude, " +
-            "a.address, b.cc_planting_date, b.cc_termination_date, " +
-            "b.cash_crop_planting_date, b.cash_crop_harvest_date FROM " +
-            "site_information as a INNER JOIN farm_history as b ON a.code=b.code" +
-            " WHERE a.code = '{}'"
+            "SELECT a.code, a.affiliation, a.county, a.longitude, a.latitude, \
+                a.address, b.cc_planting_date, b.cc_termination_date, \
+                    b.cash_crop_planting_date, b.cash_crop_harvest_date FROM \
+                        site_information as a INNER JOIN farm_history as b \
+                            ON a.code=b.code WHERE a.code = '{}'"
             .format(self.route_params_obj.get("site")), self.shadow_engine))
         return report_data
 
     def generate_report(self):
-        report_data = self.fetch_reportdata()
+        report_data = self.fetch_report_data()
 
         if report_data.empty:
             return func.HttpResponse(
-                json.dumps({"status": "error", "details": "No site code in crown db"}), 
+                json.dumps({
+                    "status": "error",
+                    "details": "No site code in crown db"}),
                 headers=global_vars.HEADER, status_code=400)
         else:
             word_bytes = io.BytesIO()
@@ -57,9 +58,9 @@ class FetchReport:
             doc.save(word_bytes)
             word_bytes.seek(0)
             return func.HttpResponse(
-                word_bytes.read(), 
-                headers=global_vars.HEADER, 
-                status_code=201, 
+                word_bytes.read(),
+                headers=global_vars.HEADER,
+                status_code=201,
                 mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 
