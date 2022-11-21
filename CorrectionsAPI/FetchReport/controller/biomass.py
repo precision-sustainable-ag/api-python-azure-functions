@@ -1,8 +1,9 @@
+import io
+import matplotlib.ticker as mticker
+from ..services import biomass
+import pandas as pd
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
-import matplotlib.ticker as mticker
-import pandas as pd
-from ..services import biomass
 
 
 def fetch_biomass(affiliation, requested_site):
@@ -39,7 +40,7 @@ def fetch_biomass(affiliation, requested_site):
 
         site_biomass = biomass_data[biomass_data['code'] == requested_site]
         if len(site_biomass) > 0 and \
-            pd.notna(site_biomass.iloc[0].get('ash_corrected_cc_dry_biomass_kg_ha')):
+                pd.notna(site_biomass.iloc[0].get('ash_corrected_cc_dry_biomass_kg_ha')):
             biomass_data['ash_corrected_cc_dry_biomass_lb_ac'] = (
                 biomass_data['ash_corrected_cc_dry_biomass_kg_ha']*0.892179)
             site_year = site_biomass.iloc[0].get('year')
@@ -51,10 +52,12 @@ def fetch_biomass(affiliation, requested_site):
             site_biomass = (
                 biomass_data.loc[biomass_data['code'] == requested_site])
 
-            yaxis = biomass_data['ash_corrected_cc_dry_biomass_lb_ac'].to_list()
+            yaxis = biomass_data['ash_corrected_cc_dry_biomass_lb_ac'].to_list(
+            )
             xaxis = list(range(1, len(yaxis)+1))
 
             # create a figure and save the plot jpg image
+            figure = io.BytesIO()
             plt.figure()
             plt.scatter(xaxis, yaxis, color='black', alpha=0.5)
             plt.scatter(int(site_biomass.iloc[0].get("Rank")), site_biomass.iloc[0].get(
@@ -67,10 +70,11 @@ def fetch_biomass(affiliation, requested_site):
             plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(2))
             plt.xlabel("Rank")
             plt.ylabel("Biomass produce in lbs/acre")
-            plt.savefig("FetchReport\\data\\Graph.png")
+            plt.savefig(figure)
+            # plt.savefig("FetchReport/Graph.png")
             plt.clf()
             plt.close()
             return site_biomass.iloc[0].get("ash_corrected_cc_dry_biomass_lb_ac"), \
-                site_biomass.iloc[0].get("cc_species")
+                site_biomass.iloc[0].get("cc_species"), figure
 
         return None
