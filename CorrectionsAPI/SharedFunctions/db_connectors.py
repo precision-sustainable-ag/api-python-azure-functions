@@ -18,8 +18,8 @@ def connect_to_crown(environment):
         crown_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(
             crown_host, crown_user, crown_dbname, crown_password, crown_sslmode)
 
-        crown_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(
-            crown_user, crown_password, crown_host, crown_dbname)
+        crown_engine_string = "postgresql://{0}:{1}@{2}:{3}/{4}".format(
+            crown_user, crown_password, crown_host, "5432", crown_dbname)
         crown_engine = sqlalchemy.create_engine(crown_engine_string)
     else:
         crown_host = os.environ.get('LOCAL_PROD_HOST')
@@ -59,8 +59,8 @@ def connect_to_shadow(environment):
         shadow_con_string = "host={0} user={1} dbname={2} password={3} sslmode={4}".format(
             shadow_host, shadow_user, shadow_dbname, shadow_password, shadow_sslmode)
 
-        shadow_engine_string = "postgresql://{0}:{1}@{2}/{3}".format(
-            shadow_user, shadow_password, shadow_host, shadow_dbname)
+        shadow_engine_string = "postgresql://{0}:{1}@{2}:{3}/{4}".format(
+            shadow_user, shadow_password, shadow_host, "5432", shadow_dbname)
         shadow_engine = sqlalchemy.create_engine(shadow_engine_string)
     else:
         shadow_host = os.environ.get('LOCAL_SHADOW_HOST')
