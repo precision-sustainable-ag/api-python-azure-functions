@@ -236,10 +236,10 @@ def doc_yield(doc, requested_site):
         doc.add_heading('Yield:', 4)
         yield_para = doc.add_paragraph('Bare Ground: ', style='List Bullet')
         yield_para.add_run(
-            str(round(bare_yield, 5))+" bushels/ac" if bare_yield else "Not available")
+            str(round(bare_yield))+" bushels/ac" if bare_yield else "Not available")
         yield_para = doc.add_paragraph('Cover: ', style='List Bullet')
         yield_para.add_run(
-            str(round(cover_yield, 5))+" bushels/ac" if cover_yield else "Not available")
+            str(round(cover_yield))+" bushels/ac" if cover_yield else "Not available")
 
     except Exception as e:
         print(e)
