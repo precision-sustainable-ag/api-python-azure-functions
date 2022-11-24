@@ -6,6 +6,7 @@ from docx.shared import Inches
 import pandas as pd
 import asyncio
 from docx import Document
+from ..controller import hyperlink
 from datetime import datetime
 import matplotlib.ticker as mticker
 import pandas as pd
@@ -71,30 +72,31 @@ class async_request:
         param_precipitation2={'lat': lat, 'lon': lon, 'start': cover_planting,\
                         'end': cover_termination, 'stats': 'sum(precipitation)'}
         param_biomass={'affiliation': affiliations, 'output':'json'}
-        param_nir={'table': 'biomass_nir', 'affiliation': affiliation, 'code': requested_site, 'output':'json'}
+        param_nir={'table': 'biomass_nir', 'affiliation': affiliation, \
+            'code': requested_site, 'output':'json'}
         param_yield={'code': requested_site}
         param_moisture={'type': 'tdr', 'start': cash_planting, 'code': requested_site}
 
         loop = asyncio.get_event_loop()
         urls = [(self.url_gdd, param_gdd1), (self.url_gdd, param_gdd2), \
-            (self.url_precipitation, param_precipitation1), (self.url_precipitation, param_precipitation2), \
-                (self.url_biomass, param_biomass), (self.url_nir, param_nir), \
-                    (self.url_yield, param_yield), (self.url_moisture, param_moisture)]
-
+            (self.url_precipitation, param_precipitation1), \
+                (self.url_precipitation, param_precipitation2), \
+                    (self.url_biomass, param_biomass), (self.url_nir, param_nir), \
+                        (self.url_yield, param_yield), (self.url_moisture, param_moisture)]
+        future = asyncio.ensure_future(self.fetch_all(urls))
         self.res_gdd1, self.res_gdd2, self.res_prec1, self.res_prec2, self.res_biomass, self.res_nir, self.res_yield, self.res_moisture = \
-            loop.run_until_complete(self.fetch_all(urls, loop))
+            loop.run_until_complete(future)
 
     async def fetch(self, session, url, params):
         async with session.get(url, params=params, headers=self.api_header) as response:
             return await response.json()
 
-    async def fetch_all(self, urls, loop):
-        for url in urls:
-            async with aiohttp.ClientSession(loop=loop) as session:
-                res_gdd1, res_gdd2, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture = \
-                    await asyncio.gather(*[self.fetch(session, url, params) for url, params in urls], return_exceptions=True)
-                # print(results)
-                return res_gdd1, res_gdd2, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture
+    async def fetch_all(self, urls):
+        async with aiohttp.ClientSession() as session:
+            res_gdd1, res_gdd2, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture = \
+                await asyncio.gather(*[self.fetch(session, url, params) for url, params in urls], return_exceptions=True)
+            # print(results)
+            return res_gdd1, res_gdd2, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture
 
     def doc_header(self):
         try:
