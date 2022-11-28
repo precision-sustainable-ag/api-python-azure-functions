@@ -9,7 +9,7 @@
         "methods": [
           "get"
         ],
-        "route": "shadowdb/report/{site}"
+        "route": "report/{site}"
       },
       {
         "type": "http",
