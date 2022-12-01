@@ -13,8 +13,10 @@ def assemble(report_data, requested_site):
     cover_termination = report_data.iloc[0].get("cc_termination_date") \
         if report_data.iloc[0].get("cc_termination_date") is not None else None
 
-    lat = round(report_data.iloc[0].get("latitude"), 4)
-    lon = round(report_data.iloc[0].get("longitude"), 4)
+    lat = round(report_data.iloc[0].get("latitude"), 4) \
+        if report_data.iloc[0].get("latitude") is not None else None
+    lon = round(report_data.iloc[0].get("longitude"), 4) \
+        if report_data.iloc[0].get("latitude") is not None else None
 
     affilition = report_data.iloc[0].get("affiliation")
 
