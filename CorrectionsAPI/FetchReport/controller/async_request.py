@@ -47,16 +47,33 @@ class async_request:
         "Indigo": "Midwest",
         "AR": "Midwest",
     }
+    res_gdd1={}
+    res_gdd2={}
+    res_prec1={}
+    res_prec2={}
+    res_biomass={}
+    res_nir={}
+    res_yield={}
+    res_moisture={}
+    cash_planting=None
+    cash_harvest=None
+    cover_planting=None
+    cover_termination=None
 
     def __init__(self, doc, report_data, requested_site, cash_planting, \
         cash_harvest, cover_planting, cover_termination, lat, lon, affiliation):
         self.doc=doc
-        self.report=report_data
+        self.report_data=report_data
         self.requested_site=requested_site
         self.cash_planting=cash_planting
         self.cash_harvest=cash_harvest
         self.cover_planting=cover_planting
         self.cover_termination=cover_termination
+
+        cash_planting=cash_planting.strftime() if cash_planting is not None else None
+        cash_harvest=cash_harvest.strftime('%Y-%m/%d') if cash_harvest is not None else None
+        cover_planting=cover_planting.strftime('%Y-%m/%d') if cover_planting is not None else None
+        cover_termination=cover_termination.strftime('%Y-%m/%d') if cover_termination is not None else None
         self.lat=lat
         self.lon=lon
         self.requested_site=requested_site
@@ -76,27 +93,61 @@ class async_request:
             'code': requested_site, 'output':'json'}
         param_yield={'code': requested_site}
         param_moisture={'type': 'tdr', 'start': cash_planting, 'code': requested_site}
-
-        loop = asyncio.get_event_loop()
-        urls = [(self.url_gdd, param_gdd1), (self.url_gdd, param_gdd2), \
+        # loop = asyncio.new_event_loop()
+        # asyncio.set_event_loop(loop)
+        # loop = asyncio.get_event_loop()
+        urls1 = [(self.url_gdd, param_gdd1), (self.url_gdd, param_gdd2), \
             (self.url_precipitation, param_precipitation1), \
                 (self.url_precipitation, param_precipitation2), \
                     (self.url_biomass, param_biomass), (self.url_nir, param_nir), \
                         (self.url_yield, param_yield), (self.url_moisture, param_moisture)]
-        future = asyncio.ensure_future(self.fetch_all(urls))
+        urls = [self.url_gdd, self.url_gdd, self.url_precipitation, self.url_precipitation, self.url_biomass, self.url_nir, self.url_yield, self.url_moisture]
+        params = [param_gdd1, param_gdd2, param_precipitation1, param_precipitation2, param_biomass, param_nir, param_yield, param_moisture]
+        # print(urls1)
+        urls2 = ['https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2021-04-16&stats=sum(gdd)&gddbase=10',
+        'https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2020-09-25&end=2021-03-10&stats=sum(gdd)&gddbase=4',
+        'https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2021-04-16&stats=sum(precipitation)',
+        'https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2020-09-25&end=2021-03-10&stats=sum(precipitation)',
+        'https://api.precisionsustainableag.org/onfarm/biomass?affiliation=AL,FL,GA,NC&output=json',
+        'https://api.precisionsustainableag.org/onfarm/raw?table=biomass_nir&affiliation=NC&code=TOX&output=json',
+        'https://api.precisionsustainableag.org/onfarm/yield?code=TOX',
+        'https://api.precisionsustainableag.org/onfarm/soil_moisture?type=tdr&start=2021-04-16&code=TOX']
+        # future = asyncio.ensure_future(self.fetch_all(urls))
         self.res_gdd1, self.res_gdd2, self.res_prec1, self.res_prec2, self.res_biomass, self.res_nir, self.res_yield, self.res_moisture = \
-            loop.run_until_complete(future)
+            asyncio.run(self.fetch_all(urls, params))
 
     async def fetch(self, session, url, params):
+        print(url, params)
         async with session.get(url, params=params, headers=self.api_header) as response:
+            print(response.url)
+            # print("")
+            # print(response.url)
+            # print(await response.json())
+            # print("")
             return await response.json()
 
-    async def fetch_all(self, urls):
+    async def fetch_all(self, urls, params):
         async with aiohttp.ClientSession() as session:
-            res_gdd1, res_gdd2, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture = \
-                await asyncio.gather(*[self.fetch(session, url, params) for url, params in urls], return_exceptions=True)
+            # res_gdd1, res_gdd2, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture = \
+            #     await asyncio.gather(*[self.fetch(session, url) for url in urls], return_exceptions=True)
             # print(results)
-            return res_gdd1, res_gdd2, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture
+            # print(res_gdd1)
+            # print("")
+            # print(res_gdd2)
+            # print("")
+            # print(res_prec1)
+            # print("")
+            # print(res_prec2)
+            # print("")
+            # print(res_biomass)
+            # print("")
+            # print(res_nir)
+            # print("")
+            # print(res_yield)
+            # print("")
+            # print(res_moisture)
+            # print("")
+            return await asyncio.gather(*[self.fetch(session, url, param) for url, param in zip(urls, params)], return_exceptions=True)
 
     def doc_header(self):
         try:
@@ -388,7 +439,7 @@ class async_request:
         # finally:
         #     return doc
 
-    def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
+    def plot_graph(self, vwc, depth="overall"):
         try:
             fig = io.BytesIO()
             vwc['date'] = pd.to_datetime(vwc['timestamp'])
@@ -440,20 +491,18 @@ class async_request:
             if len(vwc_data) != 0:
                 vwc_overall = vwc_data
 
-                fig_moisture = self.plot_graph(vwc_overall, "FetchReport/data/MoistureGraph.png",
-                                        start_date, end_date)
+                fig_moisture = self.plot_graph(vwc_overall)
                 vwc_d = vwc_data[vwc_data["center_depth"] == -5]
-                fig_moisture_D = self.plot_graph(vwc_d, "FetchReport/data/MoistureGraphD.png",
-                                            start_date, end_date, "surface")
+                fig_moisture_D = self.plot_graph(vwc_d, "surface")
+
                 vwc_c = vwc_data[vwc_data["center_depth"] == -15]
-                fig_moisture_C = self.plot_graph(vwc_c, "FetchReport/data/MoistureGraphC.png",
-                                            start_date, end_date, "6 inch")
+                fig_moisture_C = self.plot_graph(vwc_c, "6 inch")
+
                 vwc_b = vwc_data[vwc_data["center_depth"] == -45]
-                fig_moisture_B = self.plot_graph(vwc_b, "FetchReport/data/MoistureGraphB.png",
-                                            start_date, end_date, "18 inch")
+                fig_moisture_B = self.plot_graph(vwc_b, "18 inch")
+
                 vwc_a = vwc_data[vwc_data["center_depth"] == -80]
-                fig_moisture_A = self.plot_graph(vwc_a, "FetchReport/data/MoistureGraphA.png",
-                                            start_date, end_date, "31 inch")
+                fig_moisture_A = self.plot_graph(vwc_a, "31 inch")
 
                 # vwc_d['date'] = pd.to_datetime(vwc_d['timestamp'])
                 new_df = (vwc_d.groupby(['treatment', pd.Grouper(
