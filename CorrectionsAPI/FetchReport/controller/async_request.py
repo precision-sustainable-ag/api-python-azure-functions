@@ -1,6 +1,6 @@
 import asyncio
 import io
-import aiohttp
+from aiohttp import ClientSession
 # from docx import Document
 from docx.shared import Inches
 import pandas as pd
@@ -13,16 +13,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
-class async_request:
-    url_biomass='https://api.precisionsustainableag.org/onfarm/biomass'
-    url_yield='https://api.precisionsustainableag.org/onfarm/yield'
-    url_gdd='https://api.precisionsustainableag.org/weather/daily'
-    url_moisture='https://api.precisionsustainableag.org/onfarm/soil_moisture'
-    url_precipitation='https://api.precisionsustainableag.org/weather/daily'
-    url_nir='https://api.precisionsustainableag.org/onfarm/raw'
 
-    api_header = { 'Accept': 'application/json',
-                'x-api-key': 'e3d0dbf3-2884-43e3-9e5a-ad3d866df28c', }
+class AsyncRequest:
+    url_biomass = 'https://api.precisionsustainableag.org/onfarm/biomass'
+    url_yield = 'https://api.precisionsustainableag.org/onfarm/yield'
+    url_gdd = 'https://api.precisionsustainableag.org/weather/daily'
+    url_moisture = 'https://api.precisionsustainableag.org/onfarm/soil_moisture'
+    url_precipitation = 'https://api.precisionsustainableag.org/weather/daily'
+    url_nir = 'https://api.precisionsustainableag.org/onfarm/raw'
+
+    api_header = {'Accept': 'application/json',
+                  'x-api-key': 'e3d0dbf3-2884-43e3-9e5a-ad3d866df28c', }
     region = {
         "Northeast": ["PA", "VT", "NH"],
         "Southeast": ["AL", "FL", "GA", "NC"],
@@ -47,108 +48,123 @@ class async_request:
         "Indigo": "Midwest",
         "AR": "Midwest",
     }
-    res_gdd1={}
-    res_gdd2={}
-    res_prec1={}
-    res_prec2={}
-    res_biomass={}
-    res_nir={}
-    res_yield={}
-    res_moisture={}
-    cash_planting=None
-    cash_harvest=None
-    cover_planting=None
-    cover_termination=None
+    res_gdd1 = {}
+    res_gdd2 = {}
+    res_prec1 = {}
+    res_prec2 = {}
+    res_biomass = {}
+    res_nir = {}
+    res_yield = {}
+    res_moisture = {}
+    cash_planting = None
+    cash_harvest = None
+    cover_planting = None
+    cover_termination = None
 
-    def __init__(self, doc, report_data, requested_site, cash_planting, \
-        cash_harvest, cover_planting, cover_termination, lat, lon, affiliation):
-        self.doc=doc
-        self.report_data=report_data
-        self.requested_site=requested_site
-        self.cash_planting=cash_planting
-        self.cash_harvest=cash_harvest
-        self.cover_planting=cover_planting
-        self.cover_termination=cover_termination
+    def __init__(self, doc, report_data, requested_site, cash_planting,
+                 cash_harvest, cover_planting, cover_termination, lat, lon, affiliation):
+        self.doc = doc
+        self.report_data = report_data
+        self.requested_site = requested_site
+        self.cash_planting = cash_planting
+        self.cash_harvest = cash_harvest
+        self.cover_planting = cover_planting
+        self.cover_termination = cover_termination
 
-        cash_planting=cash_planting.strftime() if cash_planting is not None else None
-        cash_harvest=cash_harvest.strftime('%Y-%m/%d') if cash_harvest is not None else None
-        cover_planting=cover_planting.strftime('%Y-%m/%d') if cover_planting is not None else None
-        cover_termination=cover_termination.strftime('%Y-%m/%d') if cover_termination is not None else None
-        self.lat=lat
-        self.lon=lon
-        self.requested_site=requested_site
-        self.affiliation=affiliation
+        cash_planting = cash_planting.strftime(
+            '%Y-%m-%d') if cash_planting is not None else None
+        cash_harvest = cash_harvest.strftime(
+            '%Y-%m-%d') if cash_harvest is not None else None
+        cover_planting = cover_planting.strftime(
+            '%Y-%m-%d') if cover_planting is not None else None
+        cover_termination = cover_termination.strftime(
+            '%Y-%m-%d') if cover_termination is not None else None
+        self.lat = lat
+        self.lon = lon
+        self.requested_site = requested_site
+        self.affiliation = affiliation
         affiliations = ",".join(self.region[self.aff_2_region[affiliation]])
 
-        param_gdd1={'lat': lat, 'lon': lon, 'start': cash_planting, 'end': cash_harvest,\
-                        'stats': 'sum(gdd)', 'gddbase': 10}
-        param_gdd2={'lat': lat, 'lon': lon, 'start': cover_planting, 'end': cover_termination,\
-                        'stats': 'sum(gdd)', 'gddbase': 4}
-        param_precipitation1={'lat': lat, 'lon': lon, 'start': cash_planting,\
-                        'end': cash_harvest, 'stats': 'sum(precipitation)'}
-        param_precipitation2={'lat': lat, 'lon': lon, 'start': cover_planting,\
-                        'end': cover_termination, 'stats': 'sum(precipitation)'}
-        param_biomass={'affiliation': affiliations, 'output':'json'}
-        param_nir={'table': 'biomass_nir', 'affiliation': affiliation, \
-            'code': requested_site, 'output':'json'}
-        param_yield={'code': requested_site}
-        param_moisture={'type': 'tdr', 'start': cash_planting, 'code': requested_site}
+        param_gdd1 = {'lat': lat, 'lon': lon, 'start': cash_planting, 'end': cash_harvest,
+                      'stats': 'sum(gdd)', 'gddbase': 10}
+        param_gdd2 = {'lat': lat, 'lon': lon, 'start': cover_planting, 'end': cover_termination,
+                      'stats': 'sum(gdd)', 'gddbase': 4}
+        param_precipitation1 = {'lat': lat, 'lon': lon, 'start': cash_planting,
+                                'end': cash_harvest, 'stats': 'sum(precipitation)'}
+        param_precipitation2 = {'lat': lat, 'lon': lon, 'start': cover_planting,
+                                'end': cover_termination, 'stats': 'sum(precipitation)'}
+        param_biomass = {'affiliation': affiliations, 'output': 'json'}
+        param_nir = {'table': 'biomass_nir', 'affiliation': affiliation,
+                     'code': requested_site, 'output': 'json'}
+        param_yield = {'code': requested_site}
+        param_moisture = {'type': 'tdr',
+                          'start': cash_planting, 'code': requested_site}
+
         # loop = asyncio.new_event_loop()
         # asyncio.set_event_loop(loop)
         # loop = asyncio.get_event_loop()
-        urls1 = [(self.url_gdd, param_gdd1), (self.url_gdd, param_gdd2), \
-            (self.url_precipitation, param_precipitation1), \
-                (self.url_precipitation, param_precipitation2), \
-                    (self.url_biomass, param_biomass), (self.url_nir, param_nir), \
-                        (self.url_yield, param_yield), (self.url_moisture, param_moisture)]
-        urls = [self.url_gdd, self.url_gdd, self.url_precipitation, self.url_precipitation, self.url_biomass, self.url_nir, self.url_yield, self.url_moisture]
-        params = [param_gdd1, param_gdd2, param_precipitation1, param_precipitation2, param_biomass, param_nir, param_yield, param_moisture]
-        # print(urls1)
-        urls2 = ['https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2021-04-16&stats=sum(gdd)&gddbase=10',
-        'https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2020-09-25&end=2021-03-10&stats=sum(gdd)&gddbase=4',
+        urls1 = [(self.url_gdd, param_gdd1), (self.url_gdd, param_gdd2),
+                 (self.url_precipitation, param_precipitation1),
+                 (self.url_precipitation, param_precipitation2),
+                 (self.url_biomass, param_biomass), (self.url_nir, param_nir),
+                 (self.url_yield, param_yield), (self.url_moisture, param_moisture)]
+        urls2 = [self.url_gdd, self.url_gdd, self.url_precipitation, 
+        self.url_precipitation, self.url_biomass, self.url_nir, 
+        self.url_yield, self.url_moisture]
+        params = [param_gdd1, param_gdd2, param_precipitation1, param_precipitation2,
+                  param_biomass, param_nir, param_yield, param_moisture]
+        urls = ['https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2021-04-16&stats=sum(gdd)&gddbase=10',
         'https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2021-04-16&stats=sum(precipitation)',
         'https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2020-09-25&end=2021-03-10&stats=sum(precipitation)',
         'https://api.precisionsustainableag.org/onfarm/biomass?affiliation=AL,FL,GA,NC&output=json',
         'https://api.precisionsustainableag.org/onfarm/raw?table=biomass_nir&affiliation=NC&code=TOX&output=json',
         'https://api.precisionsustainableag.org/onfarm/yield?code=TOX',
-        'https://api.precisionsustainableag.org/onfarm/soil_moisture?type=tdr&start=2021-04-16&code=TOX']
+        'https://api.precisionsustainableag.org/onfarm/soil_moisture?type=tdr&start=2021-04-16&code=TOX',
+        'https://api.precisionsustainableag.org/weather/daily?lat=34.5317&lon=-79.2488&start=2020-09-25&end=2021-03-10&stats=sum(gdd)&gddbase=4']
         # future = asyncio.ensure_future(self.fetch_all(urls))
-        self.res_gdd1, self.res_gdd2, self.res_prec1, self.res_prec2, self.res_biomass, self.res_nir, self.res_yield, self.res_moisture = \
-            asyncio.run(self.fetch_all(urls, params))
+        loop = asyncio.new_event_loop() # event loop
+        asyncio.set_event_loop(loop)
+        future = asyncio.ensure_future(self.fetch_all(urls, params)) # tasks to do
+        loop.run_until_complete(future) # loop until done
 
-    async def fetch(self, session, url, params):
-        print(url, params)
-        async with session.get(url, params=params, headers=self.api_header) as response:
-            print(response.url)
-            # print("")
-            # print(response.url)
-            # print(await response.json())
-            # print("")
-            return await response.json()
+        # self.res_gdd1, self.res_prec1, self.res_prec2, \
+        #     self.res_biomass, self.res_nir, self.res_yield, self.res_moisture, self.res_gdd2 = \
+        #         asyncio.run(self.fetch_all(urls, params))
 
-    async def fetch_all(self, urls, params):
-        async with aiohttp.ClientSession() as session:
-            # res_gdd1, res_gdd2, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture = \
-            #     await asyncio.gather(*[self.fetch(session, url) for url in urls], return_exceptions=True)
-            # print(results)
-            # print(res_gdd1)
-            # print("")
-            # print(res_gdd2)
-            # print("")
-            # print(res_prec1)
-            # print("")
-            # print(res_prec2)
-            # print("")
-            # print(res_biomass)
-            # print("")
-            # print(res_nir)
-            # print("")
-            # print(res_yield)
-            # print("")
-            # print(res_moisture)
-            # print("")
-            return await asyncio.gather(*[self.fetch(session, url, param) for url, param in zip(urls, params)], return_exceptions=True)
 
+    async def fetch_all(self,urls, params):
+        """Launch requests for all web pages."""
+        tasks = []
+        async with ClientSession() as session:
+            for url in urls:
+                task = asyncio.ensure_future(self.fetch(url, session, params))
+                tasks.append(task) # create list of tasks
+            self.res_gdd1, self.res_prec1, self.res_prec2, self.res_biomass, self.res_nir, self.res_yield, self.res_moisture, self.res_gdd2 = await asyncio.gather(*tasks) # gather task responses
+            # print(_)
+
+    async def fetch(self,url, session, params):
+        """Fetch a url, using specified ClientSession."""
+        # start_time[url] = default_timer()
+        async with session.get(url, headers=self.api_header) as response:
+            resp = await response.json()
+            # elapsed = default_timer() - start_time[url]
+            # print('{0:30}{1:5.2f} {2}'.format(url, elapsed, asterisks(elapsed)))
+            return resp
+
+    # async def fetch(self, session, url, params):
+    #     print(url, params)
+    #     async with session.get(url, headers=self.api_header) as response:
+    #         # print(response.url)
+    #         return await response.json()
+
+    # async def fetch_all(self, urls, params):
+    #     async with aiohttp.ClientSession() as session:
+    #         res_gdd1, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture, res_gdd2 = \
+    #             await asyncio.gather(*[self.fetch(session, url, param) \
+    #                 for url, param in zip(urls, params)], return_exceptions=True)
+    #         # await aiohttp.ClientSession.close()
+    #         return res_gdd1, res_prec1, res_prec2, res_biomass, res_nir, res_yield, res_moisture, res_gdd2
+        
     def doc_header(self):
         try:
             # header section
@@ -172,13 +188,12 @@ class async_request:
     def doc_main_para(self):
         # PSA paragraph
         self.doc.add_paragraph("\nThe Precision Sustainable Agriculture (PSA)" +
-                        "On-Farm network deploys common research protocols that study the " +
-                        "short-term effects of cover crops on farms that currently use cover" +
-                        " crops. By utilizing farms with different management practices, the data" +
-                        " collected can account for a wide range of factors such as termination " +
-                        "timing, specific selections, and climate impacts. The data is used to " +
-                        "build tools to aid in site-specific management decisions.\n")
-
+                               "On-Farm network deploys common research protocols that study the " +
+                               "short-term effects of cover crops on farms that currently use cover" +
+                               " crops. By utilizing farms with different management practices, the data" +
+                               " collected can account for a wide range of factors such as termination " +
+                               "timing, specific selections, and climate impacts. The data is used to " +
+                               "build tools to aid in site-specific management decisions.\n")
 
     def doc_farmDetails(self):
         try:
@@ -224,7 +239,6 @@ class async_request:
         # finally:
         #     return doc
 
-
     def doc_cashcrop(self):
         try:
             cash_days = (self.cash_harvest-self.cash_planting).days \
@@ -232,17 +246,14 @@ class async_request:
             self.doc.add_heading('Cash crop days:', 4)
             # Cash crop dates
             self.doc.add_paragraph('Date of planting Cash crop: ', style='List Bullet'
-                            ).add_run(self.cash_planting.strftime("%m/%d/%Y") if self.cash_planting else "Not yet entered")
+                                   ).add_run(self.cash_planting.strftime("%m/%d/%Y") if self.cash_planting else "Not yet entered")
             self.doc.add_paragraph('Date of harvest Cash crop: ', style='List Bullet'
-                            ).add_run(self.cash_harvest.strftime("%m/%d/%Y") if self.cash_harvest else "Not yet entered")
+                                   ).add_run(self.cash_harvest.strftime("%m/%d/%Y") if self.cash_harvest else "Not yet entered")
             self.doc.add_paragraph('Cash crop no of days in production: ', style='List Bullet'
-                            ).add_run(str(cash_days) if cash_days else "________")
+                                   ).add_run(str(cash_days) if cash_days else "________")
 
         except Exception as e:
             print(e)
-        # finally:
-        #     return doc
-
 
     def doc_covercrop(self):
         try:
@@ -251,16 +262,13 @@ class async_request:
             self.doc.add_heading('Cover crop days:', 4)
             # Cover crop dates
             self.doc.add_paragraph('Date of planting Cover crop: ', style='List Bullet'
-                            ).add_run(self.cover_planting.strftime("%m/%d/%Y") if self.cover_planting else "Not yet entered")
+                                   ).add_run(self.cover_planting.strftime("%m/%d/%Y") if self.cover_planting else "Not yet entered")
             self.doc.add_paragraph('Date of termination Cover crop: ', style='List Bullet'
-                            ).add_run(self.cover_termination.strftime("%m/%d/%Y") if self.cover_termination else "Not yet entered")
+                                   ).add_run(self.cover_termination.strftime("%m/%d/%Y") if self.cover_termination else "Not yet entered")
             self.doc.add_paragraph('Cover crop no of days in production: ', style='List Bullet'
-                            ).add_run(str(cover_days) if cover_days else "________")
+                                   ).add_run(str(cover_days) if cover_days else "________")
         except Exception as e:
             print(e)
-        # finally:
-        #     return doc
-
 
     def doc_gdd(self):
         try:
@@ -281,9 +289,6 @@ class async_request:
 
         except Exception as e:
             print(e)
-        # finally:
-        #     return doc
-
 
     def doc_precipitation(self):
         try:
@@ -305,13 +310,12 @@ class async_request:
 
         except Exception as e:
             print(e)
-        # finally:
-        #     return doc
 
     def doc_biomass(self):
         try:
             biomass_data = pd.DataFrame(self.res_biomass)
-            site_biomass = biomass_data[biomass_data['code'] == self.requested_site]
+            site_biomass = biomass_data[biomass_data['code']
+                                        == self.requested_site]
             if len(site_biomass) > 0 and \
                     pd.notna(site_biomass.iloc[0].get('ash_corrected_cc_dry_biomass_kg_ha')):
                 biomass_data['ash_corrected_cc_dry_biomass_lb_ac'] = (
@@ -337,7 +341,6 @@ class async_request:
                     "ash_corrected_cc_dry_biomass_lb_ac"), color='red', s=50)
                 plt.text(int(site_biomass.iloc[0].get("Rank")), site_biomass.iloc[0].get(
                     "ash_corrected_cc_dry_biomass_lb_ac"), self.requested_site)
-                # plt.title("Biomass data for {reg} region in year {year}".format(reg=aff_2_region[affiliation], year=str(site_year)))
                 plt.title("This is your farm's dry matter in comparison to all farms that use \n cover crops in our network in the {reg} region".format(
                     reg=self.aff_2_region[self.affiliation]))
                 plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(2))
@@ -349,18 +352,18 @@ class async_request:
                 plt.close()
 
                 site_biomass, species, figure = site_biomass.iloc[0].get("ash_corrected_cc_dry_biomass_lb_ac"), \
-                        site_biomass.iloc[0].get("cc_species"), figure
+                    site_biomass.iloc[0].get("cc_species"), figure
                 self.doc.add_heading('Cover crop species and biomass:', 4)
                 species = species if species else "Unavailable"
                 self.doc.add_paragraph('Cover crop species: ', style='List Bullet'
-                                ).add_run(species)
+                                       ).add_run(species)
                 # Biomass and comparison
                 site_biomass = str(round(site_biomass, 1)
-                                ) if site_biomass else "Unavailable"
+                                   ) if site_biomass else "Unavailable"
                 self.doc.add_paragraph('Dry matter (lbs/acre):', style='List Bullet'
-                                ).add_run(site_biomass)
+                                       ).add_run(site_biomass)
                 biomass_comp_para = self.doc.add_paragraph('Dry matter in comparison to others in the region:' +
-                                                    ' \n', style='List Bullet')
+                                                           ' \n', style='List Bullet')
                 try:
                     figure.seek(0)
                     self.doc.add_picture(figure)
@@ -371,7 +374,6 @@ class async_request:
             print(e)
         # finally:
         #     return doc
-
 
     def doc_cropquality(self):
         try:
@@ -389,19 +391,18 @@ class async_request:
 
             self.doc.add_heading('Cover crop quality:', 4)
             self.doc.add_paragraph('% Nitrogen: ', style='List Bullet'
-                            ).add_run(str(round(nitrogen, 2)))
+                                   ).add_run(str(round(nitrogen, 2)))
             self.doc.add_paragraph('% Carbohydrates: ', style='List Bullet'
-                            ).add_run(str(round(carbohydrates, 2)))
+                                   ).add_run(str(round(carbohydrates, 2)))
             self.doc.add_paragraph('% Holo-cellulose: ', style='List Bullet'
-                            ).add_run(str(round(holo_cellulose, 2)))
+                                   ).add_run(str(round(holo_cellulose, 2)))
             self.doc.add_paragraph('% Lignin: ', style='List Bullet'
-                            ).add_run(str(round(lignin, 2)))
+                                   ).add_run(str(round(lignin, 2)))
 
         except Exception as e:
             print(e)
         # finally:
         #     return doc
-
 
     def doc_yield(self):
         try:
@@ -419,15 +420,17 @@ class async_request:
                 if len(yield_data[yield_data['treatment'] == 'B']) > 0:
                     bare_yield_data = yield_data[yield_data['treatment'] == 'B']
                     if bare_yield_data.iloc[0]['adjusted.grain.yield.Mg_ha']:
-                        bare_yield = bare_yield_data.iloc[0]['adjusted.grain.yield.Mg_ha']*\
+                        bare_yield = bare_yield_data.iloc[0]['adjusted.grain.yield.Mg_ha'] *\
                             mg_to_bushels[bare_yield_data.iloc[0]['cash.crop']]
                 if len(yield_data[yield_data['treatment'] == 'C']) > 0:
                     cover_yield_data = yield_data[yield_data['treatment'] == 'C']
                     if cover_yield_data.iloc[0]['adjusted.grain.yield.Mg_ha']:
-                        cover_yield = cover_yield_data.iloc[0]['adjusted.grain.yield.Mg_ha']*\
-                            mg_to_bushels[cover_yield_data.iloc[0]['cash.crop']]
+                        cover_yield = cover_yield_data.iloc[0]['adjusted.grain.yield.Mg_ha'] *\
+                            mg_to_bushels[cover_yield_data.iloc[0]
+                                          ['cash.crop']]
             self.doc.add_heading('Yield:', 4)
-            yield_para = self.doc.add_paragraph('Bare Ground: ', style='List Bullet')
+            yield_para = self.doc.add_paragraph(
+                'Bare Ground: ', style='List Bullet')
             yield_para.add_run(
                 str(round(bare_yield))+" bushels/ac" if bare_yield else "Not available")
             yield_para = self.doc.add_paragraph('Cover: ', style='List Bullet')
@@ -436,8 +439,6 @@ class async_request:
 
         except Exception as e:
             print(e)
-        # finally:
-        #     return doc
 
     def plot_graph(self, vwc, depth="overall"):
         try:
@@ -470,7 +471,7 @@ class async_request:
             plt.xlabel("Week")
             plt.ylabel("Moisture(%)")
             plt.title("Soil Moisture percentage at {depth} depth"
-                    .format(depth=depth))
+                      .format(depth=depth))
 
             # Adding legend, which helps us recognize curve according to it's color
             plt.legend()
@@ -481,7 +482,6 @@ class async_request:
             return fig
         except Exception as e:
             print(e)
-
 
     def doc_vwc(self):
         try:
@@ -560,9 +560,11 @@ class async_request:
                     if d not in vwc_dict.keys():
                         vwc_dict[d] = ["", ""]
                     if str(new_df.iloc[i].get('treatment')) == "b":
-                        vwc_dict[d][0] = str(round(new_df.iloc[i].get('vwc'), 3))
+                        vwc_dict[d][0] = str(
+                            round(new_df.iloc[i].get('vwc'), 3))
                     elif str(new_df.iloc[i].get('treatment')) == "c":
-                        vwc_dict[d][1] = str(round(new_df.iloc[i].get('vwc'), 3))
+                        vwc_dict[d][1] = str(
+                            round(new_df.iloc[i].get('vwc'), 3))
 
             self.doc.add_heading('Soil Temperature: ', 4)
             self.doc.add_paragraph('Temperature data: ', style='List Bullet')
@@ -626,17 +628,16 @@ class async_request:
 
         except Exception as e:
             print(e)
-        # finally:
-        #     return doc
 
     def doc_end_para(self):
         # Decision Support Tools
         self.doc.add_heading('Decision Support Tools:', 3)
         dst_para = self.doc.add_paragraph()
         dst_para.add_run('The Decision Support Tools (DSTs) are designed for farmers' +
-                        ' to input their data and receive custom generated information on how to ' +
-                        'address their management strategies. The Cover Crop Nitrogen Calculator ' +
-                        '(CC-NCALC) calculates the amount of nitrogen available after the planting ' +
-                        'and termination of a cover crop. ')
+                         ' to input their data and receive custom generated information on how to ' +
+                         'address their management strategies. The Cover Crop Nitrogen Calculator ' +
+                         '(CC-NCALC) calculates the amount of nitrogen available after the planting ' +
+                         'and termination of a cover crop. ')
+
     def conclude(self):
         return self.doc

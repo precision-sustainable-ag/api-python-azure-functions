@@ -17,7 +17,7 @@ def assemble(report_data, requested_site):
 
     affiliation = report_data.iloc[0].get("affiliation")
     doc = Document()
-    document = async_request.async_request(doc, report_data, requested_site, \
+    document = async_request.AsyncRequest(doc, report_data, requested_site, \
         cash_planting, cash_harvest, cover_planting, cover_termination, \
             lat, lon, affiliation )
     document.doc_header()
