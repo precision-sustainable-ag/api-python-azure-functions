@@ -1,5 +1,6 @@
 import os
 import requests
+import traceback
 
 
 def req(affiliations):
@@ -14,5 +15,5 @@ def req(affiliations):
         return resp, True
 
     except requests.exceptions.RequestException as e:
-        print(e)
+        traceback.print_exc()
         return e, False

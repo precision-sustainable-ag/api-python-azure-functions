@@ -1,3 +1,4 @@
+import traceback
 from ..controller import raw_nir, crop_yield, moisture
 from ..controller import gdd, precipitation, hyperlink, biomass
 import os
@@ -22,7 +23,7 @@ def doc_header(doc):
         footer_para.add_run(
             'For questions about this report, ask: abc@xyz.com')
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -57,7 +58,7 @@ def doc_farmDetails(doc, report_data):
             .format(lat=lat, lon=lon)
         hyperlink.add_hyperlink(gps_para, maps_link, maps_link)
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -76,7 +77,7 @@ def doc_cashcrop(doc, cash_planting, cash_harvest):
                           ).add_run(str(cash_days) if cash_days else "________")
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -94,7 +95,7 @@ def doc_covercrop(doc, cover_planting, cover_termination):
         doc.add_paragraph('Cover crop no of days in production: ', style='List Bullet'
                           ).add_run(str(cover_days) if cover_days else "________")
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -117,7 +118,7 @@ def doc_gdd(doc, cash_planting, cash_harvest, cover_planting, cover_termination,
             str(round(cash_gdd[0]['sum(gdd)'], 1)) if cash_gdd else "________")
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -141,7 +142,7 @@ def doc_precipitation(doc, cash_planting, cash_harvest, cover_planting, cover_te
             cash_precipitation[0]['sum(precipitation)'], 1))+" mm" if cash_precipitation else "________")
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -168,7 +169,7 @@ def doc_biomass(doc, affilition, requested_site):
             biomass_comp_para.add_run("Comparison not available")
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -188,7 +189,7 @@ def doc_cropquality(doc, affilition, requested_site):
                           ).add_run(str(round(lignin, 2)))
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -205,7 +206,7 @@ def doc_yield(doc, requested_site):
             str(round(cover_yield))+" bushels/ac" if cover_yield else "Not available")
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc
 
@@ -295,6 +296,6 @@ def doc_vwc(doc, requested_site, cash_planting, cash_harvest):
                 'Moisture A Graph not available\n', style='List Bullet')
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         return doc

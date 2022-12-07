@@ -3,6 +3,7 @@ from ..services import moisture
 import pandas as pd
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
+import traceback
 
 
 def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
@@ -46,7 +47,7 @@ def plot_graph(vwc, file_name, start_date, end_date, depth="overall"):
         plt.close()
         return fig
     except Exception as e:
-        print(e)
+        traceback.print_exc()
 
 
 def fetch_vwc(start_date, end_date, site):
