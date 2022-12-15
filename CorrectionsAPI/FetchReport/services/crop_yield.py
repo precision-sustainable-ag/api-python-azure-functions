@@ -1,5 +1,6 @@
 import os
 import requests
+import traceback
 
 
 def req(site):
@@ -13,5 +14,5 @@ def req(site):
         return resp, True
 
     except requests.exceptions.RequestException as e:
-        print(e)
+        traceback.print_exc()
         return e, False

@@ -1,5 +1,6 @@
 import os
 import requests
+import traceback
 
 
 def req(lat, lon, start_date, end_date, gddbase):
@@ -15,5 +16,5 @@ def req(lat, lon, start_date, end_date, gddbase):
         return resp, True
 
     except requests.exceptions.RequestException as e:
-        print(e)
+        traceback.print_exc()
         return e, False

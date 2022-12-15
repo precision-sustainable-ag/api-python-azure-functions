@@ -1,5 +1,6 @@
 import os
 import requests
+import traceback
 
 
 def req(start_date, end_date, site):
@@ -14,5 +15,5 @@ def req(start_date, end_date, site):
         return resp, True
 
     except requests.exceptions.RequestException as e:
-        print(e)
+        traceback.print_exc()
         return e, False
