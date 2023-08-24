@@ -5,7 +5,6 @@ import traceback
 import pandas as pd
 import azure.functions as func
 import io
-import requests
 # import asyncio
 from SharedFunctions import db_connectors, global_vars, initializer
 from .controller import assemble_doc
@@ -31,21 +30,6 @@ class FetchReport:
 
         self.requested_site = self.route_params_obj.get("site")
 
-    def fetch_site_info(self):
-        try:
-            api_key = os.environ["X_API_KEY"]
-            api_header = {'Accept': 'application/json',
-                'x-api-key': api_key, }
-            biomass_url = 'https://api.precisionsustainableag.org/onfarm/raw'
-            resp = requests.get(biomass_url, params={'table': 'site_information',\
-                'code': self.route_params_obj.get("site"), 'output':'json'},\
-                    headers=api_header)
-            return resp, True
-
-        except requests.exceptions.RequestException as e:
-            print(e)
-            return e, False
-
     def fetch_report_data(self):
         report_data = pd.DataFrame(pd.read_sql(
             "SELECT a.code, a.affiliation, a.county, a.longitude, a.latitude, \
@@ -57,15 +41,8 @@ class FetchReport:
         return report_data
 
     def generate_report(self):
-        print("HERE")
-        site_info = self.fetch_site_info()
-        print(site_info)
-
-
-        '''
         report_data = self.fetch_report_data()
 
-        
         if report_data.empty:
             return func.HttpResponse(
                 json.dumps({
@@ -85,7 +62,6 @@ class FetchReport:
                 headers=global_vars.HEADER,
                 status_code=201,
                 mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-        '''
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
