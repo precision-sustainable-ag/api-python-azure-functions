@@ -30,6 +30,9 @@ class FetchReport:
 
         self.requested_site = self.route_params_obj.get("site")
 
+    def fetch_site_information(self):
+        return None
+
     def fetch_report_data(self):
         report_data = pd.DataFrame(pd.read_sql(
             "SELECT a.code, a.affiliation, a.county, a.longitude, a.latitude, \
