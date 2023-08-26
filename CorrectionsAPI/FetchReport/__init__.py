@@ -5,6 +5,7 @@ import traceback
 import pandas as pd
 import azure.functions as func
 import io
+import requests
 # import asyncio
 from SharedFunctions import db_connectors, global_vars, initializer
 from .controller import assemble_doc
@@ -22,39 +23,50 @@ class FetchReport:
         self.auth_response = initial_state["auth_response"]
         self.invalid_params = initial_state["route_params_obj"] is None
 
-        # connect to dbs
-        if self.authenticated:
-            self.environment = os.environ.get('AZURE_FUNCTIONS_ENVIRONMENT')
-            self.shadow_con, self.shadow_cur, self.shadow_engine = \
-                db_connectors.connect_to_crown(self.environment)
-
         self.requested_site = self.route_params_obj.get("site")
 
     def fetch_site_information(self):
-        return None
+        try:
+            api_key = os.environ["X_API_KEY"]
+            api_header = {'Accept': 'application/json',
+                'x-api-key': api_key, }
+            biomass_url = 'https://api.precisionsustainableag.org/onfarm/raw'
+            resp = requests.get(biomass_url, params={'table': 'site_information',\
+                'code': self.route_params_obj.get("site"), 'output':'json'},\
+                    headers=api_header)
+            site_info = pd.DataFrame(resp.json())
+            site_info = site_info[['code', 'affiliation', 'year', 'county', 'longitude', 'latitude', 'address']]
+            return site_info, True
 
-    def fetch_report_data(self):
-        report_data = pd.DataFrame(pd.read_sql(
-            "SELECT a.code, a.affiliation, a.county, a.longitude, a.latitude, \
-                a.address, b.cc_planting_date, b.cc_termination_date, \
-                    b.cash_crop_planting_date, b.cash_crop_harvest_date FROM \
-                        site_information as a INNER JOIN farm_history as b \
-                            ON a.code=b.code WHERE a.code = '{}'"
-            .format(self.route_params_obj.get("site")), self.shadow_engine))
-        return report_data
+        except requests.exceptions.RequestException as e:
+            print(e)
+            return e, False
+        
+    def fetch_farm_history(self):
+        try:
+            api_key = os.environ["X_API_KEY"]
+            api_header = {'Accept': 'application/json',
+                'x-api-key': api_key, }
+            biomass_url = 'https://api.precisionsustainableag.org/onfarm/raw'
+            resp = requests.get(biomass_url, params={'table': 'farm_history',\
+                'code': self.route_params_obj.get("site"), 'output':'json'},\
+                    headers=api_header)
+            farm_hist = pd.DataFrame(resp.json())
+            farm_hist = farm_hist[['cc_planting_date', 'cc_termination_date', 'cash_crop_planting_date', 'cash_crop_harvest_date']]
+            return farm_hist, True
+
+        except requests.exceptions.RequestException as e:
+            print(e)
+            return e, False
+
 
     def generate_report(self):
-        report_data = self.fetch_report_data()
+        site_info, site_info_status = self.fetch_site_information()
+        farm_hist, farm_hist_status = self.fetch_farm_history()
 
-        if report_data.empty:
-            return func.HttpResponse(
-                json.dumps({
-                    "status": "error",
-                    "details": "No site code in crown db"}),
-                headers=global_vars.HEADER, status_code=400)
-        else:
+        if site_info_status and farm_hist_status and not site_info.empty and not farm_hist.empty:
             word_bytes = io.BytesIO()
-            doc = assemble_doc.assemble(report_data, self.requested_site)
+            doc = assemble_doc.assemble(site_info, farm_hist, self.requested_site)
 
             # Save the document to a location/share as API response
             # file_name = 'SummaryReport'+self.requested_site+'.docx'
@@ -65,6 +77,13 @@ class FetchReport:
                 headers=global_vars.HEADER,
                 status_code=201,
                 mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        else:
+            return func.HttpResponse(
+                json.dumps({
+                    "status": "error",
+                    "details": "No site code in crown db"}),
+                headers=global_vars.HEADER, status_code=400)
+        
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:

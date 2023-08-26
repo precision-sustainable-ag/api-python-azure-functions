@@ -1,31 +1,48 @@
 from ..controller import create_doc
 from docx import Document
 from datetime import datetime
+import pandas as pd
 
 
-def assemble(report_data, requested_site):
-    cash_planting = report_data.iloc[0].get("cash_crop_planting_date") \
-        if report_data.iloc[0].get("cash_crop_planting_date") is not None else None
-    cash_harvest = report_data.iloc[0].get("cash_crop_harvest_date") \
-        if report_data.iloc[0].get("cash_crop_harvest_date") is not None else None
-    cover_planting = report_data.iloc[0].get("cc_planting_date") \
-        if report_data.iloc[0].get("cc_planting_date") is not None else None
-    cover_termination = report_data.iloc[0].get("cc_termination_date") \
-        if report_data.iloc[0].get("cc_termination_date") is not None else None
+def assemble(site_info, farm_hist, requested_site):
+    cash_planting = farm_hist['cash_crop_planting_date'].iloc[0]
+    if cash_planting == "" or cash_planting is None:
+        cash_planting = None
+    else:
+        cash_planting = pd.to_datetime(cash_planting)
 
-    lat = round(report_data.iloc[0].get("latitude"), 4) \
-        if report_data.iloc[0].get("latitude") is not None else None
-    lon = round(report_data.iloc[0].get("longitude"), 4) \
-        if report_data.iloc[0].get("latitude") is not None else None
+    cash_harvest = farm_hist['cash_crop_harvest_date'].iloc[0]
+    if cash_harvest == "" or cash_harvest is None:
+        cash_harvest = None
+    else:
+        cash_harvest = pd.to_datetime(cash_harvest)
 
-    affilition = report_data.iloc[0].get("affiliation")
+    cover_planting = farm_hist['cc_planting_date'].iloc[0]
+    if cover_planting == "" or cover_planting is None:
+        cover_planting = None
+    else:
+        cover_planting = pd.to_datetime(cover_planting)
+
+    cover_termination = farm_hist['cc_termination_date'].iloc[0]
+    if cover_termination == "" or cover_termination is None:
+        cover_termination = None
+    else:
+        cover_termination = pd.to_datetime(cover_termination)
+
+
+    lat = round(site_info.iloc[0].get("latitude"), 4) \
+        if site_info.iloc[0].get("latitude") is not None else None
+    lon = round(site_info.iloc[0].get("longitude"), 4) \
+        if site_info.iloc[0].get("latitude") is not None else None
+
+    affilition = site_info.iloc[0].get("affiliation")
 
     doc = Document()
     doc = create_doc.doc_header(doc)
 
     # PSA paragraph
     doc.add_paragraph("\nThe Precision Sustainable Agriculture (PSA)" +
-                      "On-Farm network deploys common research protocols that study the " +
+                      " On-Farm network deploys common research protocols that study the " +
                       "short-term effects of cover crops on farms that currently use cover" +
                       " crops. By utilizing farms with different management practices, the data" +
                       " collected can account for a wide range of factors such as termination " +
@@ -33,10 +50,10 @@ def assemble(report_data, requested_site):
                       "build tools to aid in site-specific management decisions.\n")
 
     doc.add_heading('Farm Details', 2)
-    doc = create_doc.doc_farmDetails(doc, report_data)
+    doc = create_doc.doc_farmDetails(doc, site_info)
 
     # Dates this report summarizes
-    doc.add_heading('Dates this report summarizes:', 4)
+    doc.add_heading('Report Generated On:', 4)
     current_date = datetime.now()
     doc.add_paragraph(current_date.strftime("%m/%d/%Y"))
 
@@ -47,6 +64,7 @@ def assemble(report_data, requested_site):
     doc = create_doc.doc_cashcrop(doc, cash_planting, cash_harvest)
     doc = create_doc.doc_covercrop(doc, cover_planting, cover_termination)
 
+    
     # GDD
     doc = create_doc.doc_gdd(
         doc, cash_planting, cash_harvest, cover_planting, cover_termination, lat, lon)
@@ -56,24 +74,19 @@ def assemble(report_data, requested_site):
         doc, cash_planting, cash_harvest, cover_planting, cover_termination, lat, lon)
 
     # Biomass
-    doc = create_doc.doc_biomass(doc, affilition, requested_site)
+    doc = create_doc.doc_biomass(doc, site_info, requested_site)
 
     # Composition
     doc = create_doc.doc_cropquality(doc, affilition, requested_site)
 
     # Yield
-    doc = create_doc.doc_yield(doc, requested_site)
+    doc = create_doc.doc_yield(doc, site_info, requested_site)
 
     # Temperature, Water and Moisture
     doc = create_doc.doc_vwc(doc, requested_site, cash_planting, cash_harvest)
-
+    
     # Decision Support Tools
-    doc.add_heading('Decision Support Tools:', 3)
-    dst_para = doc.add_paragraph()
-    dst_para.add_run('The Decision Support Tools (DSTs) are designed for farmers' +
-                     ' to input their data and receive custom generated information on how to ' +
-                     'address their management strategies. The Cover Crop Nitrogen Calculator ' +
-                     '(CC-NCALC) calculates the amount of nitrogen available after the planting ' +
-                     'and termination of a cover crop. ')
+    doc = create_doc.doc_dst_para(doc)
+
 
     return doc
