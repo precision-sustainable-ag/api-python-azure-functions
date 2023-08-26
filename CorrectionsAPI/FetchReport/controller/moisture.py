@@ -55,10 +55,13 @@ def fetch_vwc(start_date, end_date, site):
     resp, resp_status = moisture.req(start_date, end_date, site)
     if (resp_status):
         vwc_data = pd.DataFrame(resp.json())
-        vwc_data = vwc_data[vwc_data['vwc']<=100]
+
+        #temporary solution to data outliers:
+        vwc_data = vwc_data[vwc_data['vwc']<=100] if not vwc_data.empty else vwc_data
+        vwc_data = vwc_data[vwc_data['vwc']>=0] if not vwc_data.empty else vwc_data
+
         if len(vwc_data) != 0:
             vwc_overall = vwc_data
-
             fig_moisture = plot_graph(vwc_overall, "FetchReport/data/SoilMoistureGraph.png",
                                       start_date, end_date)
             vwc_d = vwc_data[vwc_data["center_depth"] == -5]

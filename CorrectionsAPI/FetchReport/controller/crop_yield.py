@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
 
-def fetch_yield(site_info, requested_site):
+def fetch_yield(affiliation, year, requested_site):
 
     region = {
         "Northeast": ["PA", "VT", "NH"],
@@ -38,9 +38,6 @@ def fetch_yield(site_info, requested_site):
         "Soybeans": 15,
         "Cotton": 28
     }
-
-    affiliation = site_info.iloc[0].get("affiliation")
-    year = site_info.iloc[0].get("year")
 
     affiliations = ",".join(region[aff_2_region[affiliation]])
     resp, resp_status = crop_yield.req(affiliations)
@@ -84,8 +81,11 @@ def fetch_yield(site_info, requested_site):
         plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False) 
             
         if site_rank:
-            bare_yield = site_yield[site_yield['treatment'] == 'B']['adjusted.grain.yield.bushels_acre'].iloc[0]
-            cover_yield = site_yield[site_yield['treatment'] == 'C']['adjusted.grain.yield.bushels_acre'].iloc[0]
+            bare_yield = site_yield[site_yield['treatment'] == 'B']
+            bare_yield = bare_yield['adjusted.grain.yield.bushels_acre'].iloc[0] if not bare_yield.empty else None
+            cover_yield = site_yield[site_yield['treatment'] == 'C']
+            cover_yield = cover_yield['adjusted.grain.yield.bushels_acre'].iloc[0] if not cover_yield.empty else None
+
             cash_crop = site_yield.iloc[0]['cash.crop']
             bare = plt.scatter(site_rank, bare_yield, marker='s', facecolors='none', edgecolors='black', s=50)
             cover = plt.scatter(site_rank, cover_yield, marker='s', color='black', s=50)
@@ -96,7 +96,7 @@ def fetch_yield(site_info, requested_site):
             plt.close()
             return bare_yield, cover_yield, cash_crop, figure
         else:
-            plt.title("This is the Adjusted Grain Yield of all Farms that use Cover Crops in our Network in the {reg} Region".format(reg=aff_2_region[affiliation]))
+            plt.title("This is the Adjusted Grain Yield of all Farms in the {reg} Region".format(reg=aff_2_region[affiliation]))
             plt.savefig(figure)
             plt.clf()
             plt.close()

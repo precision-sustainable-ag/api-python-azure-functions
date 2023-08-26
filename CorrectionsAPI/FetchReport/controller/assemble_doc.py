@@ -35,7 +35,8 @@ def assemble(site_info, farm_hist, requested_site):
     lon = round(site_info.iloc[0].get("longitude"), 4) \
         if site_info.iloc[0].get("latitude") is not None else None
 
-    affilition = site_info.iloc[0].get("affiliation")
+    affiliation = site_info.iloc[0].get("affiliation")
+    year = site_info.iloc[0].get("year")
 
     doc = Document()
     doc = create_doc.doc_header(doc)
@@ -74,13 +75,13 @@ def assemble(site_info, farm_hist, requested_site):
         doc, cash_planting, cash_harvest, cover_planting, cover_termination, lat, lon)
 
     # Biomass
-    doc = create_doc.doc_biomass(doc, site_info, requested_site)
+    doc = create_doc.doc_biomass(doc, affiliation, year, requested_site)
 
     # Composition
-    doc = create_doc.doc_cropquality(doc, affilition, requested_site)
+    doc = create_doc.doc_cropquality(doc, affiliation, requested_site)
 
     # Yield
-    doc = create_doc.doc_yield(doc, site_info, requested_site)
+    doc = create_doc.doc_yield(doc, affiliation, year, requested_site)
 
     # Temperature, Water and Moisture
     doc = create_doc.doc_vwc(doc, requested_site, cash_planting, cash_harvest)

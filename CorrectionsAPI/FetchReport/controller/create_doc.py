@@ -147,10 +147,10 @@ def doc_precipitation(doc, cash_planting, cash_harvest, cover_planting, cover_te
         return doc
 
 
-def doc_biomass(doc, site_info, requested_site):
+def doc_biomass(doc, affiliation, year, requested_site):
     try:
         site_biomass, species, figure = biomass.fetch_biomass(
-            site_info, requested_site)
+            affiliation, year, requested_site)
         
         doc.add_heading('Cover Crop Species and Biomass:', 4)
 
@@ -214,9 +214,9 @@ def doc_cropquality(doc, affilition, requested_site):
         return doc
 
 
-def doc_yield(doc, site_info, requested_site): 
+def doc_yield(doc, affiliation, year, requested_site): 
     try:
-        bare_yield, cover_yield, cash_crop, figure = crop_yield.fetch_yield(site_info, requested_site)
+        bare_yield, cover_yield, cash_crop, figure = crop_yield.fetch_yield(affiliation, year, requested_site)
 
         doc.add_heading('Yield:', 4)
         doc.add_paragraph('Cash Crop Species: ', style='List Bullet').add_run(cash_crop if cash_crop else "Not available")
